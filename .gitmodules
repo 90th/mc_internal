@@ -1,0 +1,9 @@
+[submodule "deps/imgui"]
+	path = deps/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "deps/jnihook"]
+	path = deps/jnihook
+	url = https://github.com/rdbo/jnihook.git
+[submodule "deps/libmem"]
+	path = deps/libmem
+	url = https://github.com/rdbo/libmem.git
