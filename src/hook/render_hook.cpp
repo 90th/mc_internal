@@ -98,23 +98,25 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
   glGetIntegerv(GL_FRAMEBUFFER_BINDING, &last_fbo);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  glDisable(GL_CULL_FACE);
-  glDisable(GL_DEPTH_TEST);
-  glDisable(GL_SCISSOR_TEST);
-  glDisable(GL_PRIMITIVE_RESTART);
-
-  glEnable(GL_BLEND);
-  glBlendEquation(GL_FUNC_ADD);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-
-  glViewport(0, 0, display_w, display_h);
-
+  GLboolean last_enable_primitive_restart = glIsEnabled(GL_PRIMITIVE_RESTART);
+  GLint last_active_texture = 0;
+  glGetIntegerv(GL_ACTIVE_TEXTURE, &last_active_texture);
   glActiveTexture(GL_TEXTURE0);
+  GLint last_texture = 0;
+  glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
+  GLint last_sampler = 0;
+  glGetIntegerv(GL_SAMPLER_BINDING, &last_sampler);
+
+  glDisable(GL_PRIMITIVE_RESTART);
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindSampler(0, 0);
 
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+  if (last_enable_primitive_restart) { glEnable(GL_PRIMITIVE_RESTART); }
+  glActiveTexture(last_active_texture);
+  glBindTexture(GL_TEXTURE_2D, last_texture);
+  glBindSampler(0, last_sampler);
   glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(last_fbo));
 
   if (g_original_swap_buffers != nullptr) { g_original_swap_buffers(window); }
@@ -122,11 +124,17 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
 
 }  // namespace
 
-std::expected<void, BootstrapError> InstallRenderHook() {
+std::expected<void, BootstrapError> InstallRenderHook(JavaVM* jvm) {
   auto lookup = LocateGlfwInLwjgl();
   if (lookup.swap_buffers_address == nullptr) {
     return std::unexpected(BootstrapError::kSwapBuffersLookupFailed);
   }
+
+  // allocate and populate the context before the hook goes live.
+  // this ensures the state is ready if the render thread fires instantly.
+  g_ctx = std::make_unique<OverlayContext>();
+  g_ctx->jvm = jvm;
+  g_ctx->glfw = std::move(lookup.functions);
 
   static_assert(sizeof(GlfwSwapBuffersFn) == sizeof(lm_address_t));
 
@@ -136,11 +144,10 @@ std::expected<void, BootstrapError> InstallRenderHook() {
                   reinterpret_cast<lm_address_t*>(&g_original_swap_buffers));
 
   if (hook_size == 0 || g_original_swap_buffers == nullptr) {
+    // rollback the context allocation if the hook fails.
+    g_ctx.reset();
     return std::unexpected(BootstrapError::kSwapBuffersHookFailed);
   }
-
-  g_ctx = std::make_unique<OverlayContext>();
-  g_ctx->glfw = std::move(lookup.functions);
 
   return {};
 }

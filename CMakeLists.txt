@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.24)
 
 project(mc_internal LANGUAGES C CXX ASM)
 
+# Export compile commands so clangd and other tools can find per-file flags
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -84,6 +87,11 @@ target_sources(mc_internal PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/jvm_attachment.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/jni_hook.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/bootstrap.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/sdk/jni_cache.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/sdk/math.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/sdk/minecraft.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/features/module_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/features/debug_hud_module.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/opengl_state.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/imgui_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/input_handler.cpp

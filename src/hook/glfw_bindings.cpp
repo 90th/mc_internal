@@ -17,15 +17,25 @@ int LocateLwjglGlfwCallback(struct dl_phdr_info* info, size_t /*size*/, void* da
   const char* module_path = info->dlpi_name != nullptr ? info->dlpi_name : "";
   const std::string_view path(module_path);
 
-  if (path.find("glfw") == std::string_view::npos || path.find("lwjgl") == std::string_view::npos) {
+  // skip the jni wrapper library. if we hook this, dlsym returns plt stubs
+  // or uninitialized dependencies, causing the 65537 gl error.
+  if (path.find("liblwjgl_glfw") != std::string_view::npos) { return 0; }
+
+  // match the actual native glfw shared object (supports x11 and wayland).
+  if (path.find("libglfw.so") == std::string_view::npos &&
+      path.find("libglfw_wayland.so") == std::string_view::npos) {
     return 0;
   }
 
   void* handle = dlopen(info->dlpi_name, RTLD_NOLOAD | RTLD_LAZY);
-  if (handle == nullptr) { return 1; }
+  if (handle == nullptr) { return 0; }
 
   auto* result = static_cast<LookupCallbackData*>(data);
   result->swap_buffers_address = dlsym(handle, "glfwSwapBuffers");
+
+  // if glfwswapbuffers isn't here, it's not the right library.
+  if (result->swap_buffers_address == nullptr) { return 0; }
+
   result->functions.get_framebuffer_size =
       reinterpret_cast<GlfwGetFramebufferSizeFn>(dlsym(handle, "glfwGetFramebufferSize"));
   result->functions.get_window_size =

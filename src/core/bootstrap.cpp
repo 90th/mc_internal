@@ -31,7 +31,7 @@ static void BootstrapImpl(JavaVM* jvm) {
 
   std::println("{} jnihook ready", kLogPrefix);
 
-  if (const auto render_hook = InstallRenderHook(); !render_hook) {
+  if (const auto render_hook = InstallRenderHook(attachment->jvm()); !render_hook) {
     PrintFailure("render hook", render_hook.error());
     return;
   }

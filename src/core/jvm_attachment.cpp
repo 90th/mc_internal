@@ -3,6 +3,8 @@
 namespace mc_internal {
 
 std::expected<JvmThreadAttachment, BootstrapError> AttachCurrentThread(JavaVM* jvm) {
+  if (jvm == nullptr) { return std::unexpected(BootstrapError::kThreadAttachFailed); }
+
   void* raw_env = nullptr;
   const auto get_env_result = jvm->GetEnv(&raw_env, JNI_VERSION_1_6);
 

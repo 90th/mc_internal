@@ -7,20 +7,24 @@
 namespace mc_internal {
 
 void RenderMenu(GLFWwindow* window, const OverlayContext& ctx) {
+  if (ctx.show_menu) {
+    ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(
+        ImVec2(std::max(360.0f, static_cast<float>(ctx.window_width) * 0.35f),
+               std::max(180.0f, static_cast<float>(ctx.window_height) * 0.25f)),
+        ImGuiCond_FirstUseEver);
+
+    ImGui::Begin("mc internal");
+    ImGui::Text("opengl hook active");
+    ImGui::Text("pinned window: %p", static_cast<const void*>(window));
+    ImGui::Text("logical window: %d x %d", ctx.window_width, ctx.window_height);
+    ImGui::Text("framebuffer: %d x %d", ctx.display_width, ctx.display_height);
+    ImGui::End();
+  }
+
+  ctx.module_manager.RenderUi(ctx);
+
   if (!ctx.show_menu) { return; }
-
-  ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2(std::max(360.0f, static_cast<float>(ctx.window_width) * 0.35f),
-                                  std::max(180.0f, static_cast<float>(ctx.window_height) * 0.25f)),
-                           ImGuiCond_FirstUseEver);
-
-  ImGui::Begin("mc internal");
-  ImGui::Text("opengl hook active");
-  ImGui::Text("pinned window: %p", static_cast<const void*>(window));
-  ImGui::Text("logical window: %d x %d", ctx.window_width, ctx.window_height);
-  ImGui::Text("framebuffer: %d x %d", ctx.display_width, ctx.display_height);
-  ImGui::Text("1");
-  ImGui::End();
 
   // draw a custom dark red cursor on top of everything
   ImDrawList* fg = ImGui::GetForegroundDrawList();

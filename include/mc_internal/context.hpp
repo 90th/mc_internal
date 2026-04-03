@@ -1,6 +1,10 @@
 #pragma once
 
+#include <jni.h>
+
+#include "mc_internal/features/module_manager.hpp"
 #include "mc_internal/hook/glfw_bindings.hpp"
+#include "mc_internal/sdk/jni_cache.hpp"
 
 namespace mc_internal {
 
@@ -9,7 +13,8 @@ namespace mc_internal {
 // All overlay subsystems receive a reference to this struct rather than
 // maintaining their own module-level statics.
 struct OverlayContext {
-  bool show_menu = false;
+  JavaVM* jvm = nullptr;
+  bool show_menu = true;
   GLFWwindow* pinned_window = nullptr;
   int window_width = 0;
   int window_height = 0;
@@ -26,6 +31,10 @@ struct OverlayContext {
 
   // Dynamically resolved GLFW entry points.
   GlfwFunctions glfw{};
+
+  // Per-process JNI cache and feature registry used by the render thread.
+  mutable JniCache jni_cache{};
+  mutable ModuleManager module_manager{};
 };
 
 }  // namespace mc_internal
