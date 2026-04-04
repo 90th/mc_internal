@@ -21,6 +21,8 @@ OpenGlBootstrapState PrepareOpenGlStateForImGuiBootstrap() {
   glGetIntegerv(GL_UNPACK_SKIP_PIXELS, &state.unpack_skip_pixels);
   glGetIntegerv(GL_UNPACK_ALIGNMENT, &state.unpack_alignment);
   glGetIntegerv(GL_UNPACK_SKIP_IMAGES, &state.unpack_skip_images);
+  glGetIntegerv(GL_UNPACK_SWAP_BYTES, &state.unpack_swap_bytes);
+  glGetIntegerv(GL_UNPACK_LSB_FIRST, &state.unpack_lsb_first);
 
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, 0);
@@ -31,6 +33,8 @@ OpenGlBootstrapState PrepareOpenGlStateForImGuiBootstrap() {
   glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   glPixelStorei(GL_UNPACK_SKIP_IMAGES, 0);
+  glPixelStorei(GL_UNPACK_SWAP_BYTES, 0);
+  glPixelStorei(GL_UNPACK_LSB_FIRST, 0);
 
   return state;
 }
@@ -45,6 +49,8 @@ void RestoreOpenGlStateAfterImGuiBootstrap(const OpenGlBootstrapState& state) {
   glPixelStorei(GL_UNPACK_SKIP_PIXELS, state.unpack_skip_pixels);
   glPixelStorei(GL_UNPACK_ALIGNMENT, state.unpack_alignment);
   glPixelStorei(GL_UNPACK_SKIP_IMAGES, state.unpack_skip_images);
+  glPixelStorei(GL_UNPACK_SWAP_BYTES, state.unpack_swap_bytes);
+  glPixelStorei(GL_UNPACK_LSB_FIRST, state.unpack_lsb_first);
   glActiveTexture(state.active_texture);
 }
 

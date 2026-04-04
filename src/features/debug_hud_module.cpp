@@ -1,5 +1,7 @@
 #include "mc_internal/features/debug_hud_module.hpp"
 
+#include <cstdio>
+
 #include "imgui.h"
 
 #include "mc_internal/context.hpp"
@@ -8,7 +10,8 @@
 
 namespace mc_internal {
 
-DebugHudModule::DebugHudModule() : Module("Debug HUD", "Displays the local player coordinates") {}
+DebugHudModule::DebugHudModule()
+    : Module("debug hud", "displays the local player coordinates", ModuleCategory::kMisc) {}
 
 void DebugHudModule::on_render_ui(const OverlayContext& ctx) {
   ImGui::SetNextWindowPos(ImVec2(320.0f, 40.0f), ImGuiCond_FirstUseEver);
@@ -18,34 +21,39 @@ void DebugHudModule::on_render_ui(const OverlayContext& ctx) {
 
   const auto attachment = AttachCurrentThread(ctx.jvm);
   if (!attachment) {
-    ImGui::Text("Player: JNI unavailable");
+    ImGui::TextUnformatted("player: jni unavailable");
     ImGui::End();
     return;
   }
 
   const JniEnv env(attachment->env());
   if (!ctx.jni_cache.Initialize(env)) {
-    ImGui::Text("Player: JNI cache unavailable");
+    ImGui::TextUnformatted("player: jni cache unavailable");
     ImGui::End();
     return;
   }
 
   auto minecraft_instance = Minecraft::GetInstance(env, ctx.jni_cache);
   if (!minecraft_instance) {
-    ImGui::Text("Player: Not in game");
+    ImGui::TextUnformatted("player: not in game");
     ImGui::End();
     return;
   }
 
   auto player = Minecraft::GetLocalPlayer(env, ctx.jni_cache, minecraft_instance.get());
   if (!player) {
-    ImGui::Text("Player: Not in game");
+    ImGui::TextUnformatted("player: not in game");
     ImGui::End();
     return;
   }
 
   const auto [x, y, z] = ClientPlayerEntity::GetCoordinates(env, ctx.jni_cache, player.get());
-  ImGui::Text("Pos: %.2f, %.2f, %.2f", x, y, z);
+
+  // Format the string locally to bypass ImGui varargs corruption
+  char buffer[128];
+  std::snprintf(buffer, sizeof(buffer), "pos: %.2f, %.2f, %.2f", x, y, z);
+  ImGui::TextUnformatted(buffer);
+
   ImGui::End();
 }
 

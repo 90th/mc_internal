@@ -15,6 +15,8 @@ namespace mc_internal {
 namespace {
 
 constexpr float kPi = 3.14159265358979323846f;
+constexpr float kMinRenderDistance = 16.0f;
+constexpr float kMaxRenderDistance = 512.0f;
 
 float ToRadians(float degrees) { return degrees * (kPi / 180.0f); }
 
@@ -61,11 +63,9 @@ void BuildViewMatrix(const Vec3& camera_position,
 
   Vec3 right;
   if (std::abs(pitch_degrees) > 89.0f) {
-    // Prevent Gimbal Lock when looking straight up or down
     right = {-std::cos(yaw), 0.0, -std::sin(yaw)};
   } else {
     const Vec3 world_up = {0.0, 1.0, 0.0};
-    // FIX: Cross product order swapped to fix the inverted X-axis
     right = Normalize(Cross(forward, world_up));
   }
 
@@ -90,10 +90,73 @@ void BuildViewMatrix(const Vec3& camera_position,
 
 }  // namespace
 
-EspModule::EspModule() : Module("ESP", "Draws projected 2D boxes around world entities") {}
+EspModule::EspModule()
+    : Module("entity esp",
+             "draws projected 2d boxes around world entities",
+             ModuleCategory::kVisuals) {}
+
+void EspModule::on_render_settings(const OverlayContext& ctx) {
+  static_cast<void>(ctx);
+
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextUnformatted("entity boxes");
+  if (ImGui::IsItemHovered()) { ImGui::SetTooltip("baseline visuals"); }
+
+  ImGui::Spacing();
+  ImGui::Separator();
+  ImGui::Spacing();
+
+  if (ImGui::BeginTable("esp_settings_table",
+                        2,
+                        ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerV)) {
+    ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+    ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("target group");
+    if (ImGui::IsItemHovered()) { ImGui::SetTooltip("this keeps the first pass simple"); }
+    ImGui::TableSetColumnIndex(1);
+    ImGui::Checkbox("show players", &show_players_);
+
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("max distance");
+    if (ImGui::IsItemHovered()) { ImGui::SetTooltip("this trims visual noise and draw cost"); }
+    ImGui::TableSetColumnIndex(1);
+    ImGui::PushItemWidth(-1.0f);
+    ImGui::SliderFloat("##esp_max_render_distance",
+                       &max_render_distance_,
+                       kMinRenderDistance,
+                       kMaxRenderDistance,
+                       "%.0f blocks");
+    ImGui::PopItemWidth();
+
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("box tint");
+    if (ImGui::IsItemHovered()) { ImGui::SetTooltip("this is the shared color for the base pass"); }
+    ImGui::TableSetColumnIndex(1);
+    ImGui::PushItemWidth(-1.0f);
+
+    // Disable the corrupted tooltip on the color picker entirely
+    ImGui::ColorEdit4("##esp_color",
+                      esp_color_.data(),
+                      ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_AlphaBar |
+                          ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip);
+    ImGui::PopItemWidth();
+
+    ImGui::EndTable();
+  }
+
+  ImGui::Spacing();
+}
 
 void EspModule::on_render_3d(const OverlayContext& ctx) {
-  if (ctx.display_width <= 0 || ctx.display_height <= 0) { return; }
+  if (!show_players_ || ctx.display_width <= 0 || ctx.display_height <= 0) { return; }
 
   const auto attachment = AttachCurrentThread(ctx.jvm);
   if (!attachment) { return; }
@@ -132,6 +195,10 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
                          1000.0f,
                          projection_matrix.data());
 
+  const double max_render_distance_sq =
+      static_cast<double>(max_render_distance_) * static_cast<double>(max_render_distance_);
+  const ImU32 esp_color = ImGui::ColorConvertFloat4ToU32(
+      ImVec4(esp_color_[0], esp_color_[1], esp_color_[2], esp_color_[3]));
   ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
   for (auto entity : ClientWorld::GetEntities(env, ctx.jni_cache, world.get())) {
     if (!entity) { continue; }
@@ -145,6 +212,12 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
     const double entity_x = Lerp(entity_data.prev_x, entity_data.x, tick_delta);
     const double entity_y = Lerp(entity_data.prev_y, entity_data.y, tick_delta);
     const double entity_z = Lerp(entity_data.prev_z, entity_data.z, tick_delta);
+
+    const double dx = entity_x - camera_position.x;
+    const double dy = entity_y - camera_position.y;
+    const double dz = entity_z - camera_position.z;
+    const double distance_sq = dx * dx + dy * dy + dz * dz;
+    if (distance_sq > max_render_distance_sq) { continue; }
 
     const Vec3 feet = {entity_x, entity_y, entity_z};
     const Vec3 head = {
@@ -175,7 +248,7 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
     const float half_width = height * 0.25f;
     draw_list->AddRect(ImVec2(head_screen.x - half_width, top),
                        ImVec2(head_screen.x + half_width, bottom),
-                       IM_COL32(220, 40, 40, 255),
+                       esp_color,
                        0.0f,
                        0,
                        1.5f);

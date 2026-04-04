@@ -1,24 +1,120 @@
 #include "mc_internal/ui/menu.hpp"
 
 #include <algorithm>
+#include <array>
 
 #include "imgui.h"
 
+#include "mc_internal/features/module.hpp"
+
 namespace mc_internal {
+
+namespace {
+
+constexpr ImVec4 kSelectedCategoryColor = ImVec4(0.647f, 0.231f, 0.231f, 1.0f);
+
+const char* ToDisplayName(ModuleCategory category) {
+  switch (category) {
+    case ModuleCategory::kCombat:
+      return "combat";
+    case ModuleCategory::kVisuals:
+      return "visuals";
+    case ModuleCategory::kMovement:
+      return "movement";
+    case ModuleCategory::kMisc:
+      return "misc";
+  }
+
+  return "misc";
+}
+
+}  // namespace
 
 void RenderMenu(GLFWwindow* window, const OverlayContext& ctx) {
   if (ctx.show_menu) {
+    static ModuleCategory selected_category = ModuleCategory::kVisuals;
+
     ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(
-        ImVec2(std::max(360.0f, static_cast<float>(ctx.window_width) * 0.35f),
-               std::max(180.0f, static_cast<float>(ctx.window_height) * 0.25f)),
+        ImVec2(std::max(760.0f, static_cast<float>(ctx.window_width) * 0.58f),
+               std::max(460.0f, static_cast<float>(ctx.window_height) * 0.62f)),
         ImGuiCond_FirstUseEver);
 
-    ImGui::Begin("mc internal");
-    ImGui::Text("opengl hook active");
-    ImGui::Text("pinned window: %p", static_cast<const void*>(window));
-    ImGui::Text("logical window: %d x %d", ctx.window_width, ctx.window_height);
-    ImGui::Text("framebuffer: %d x %d", ctx.display_width, ctx.display_height);
+    ImGui::Begin("mc internal", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
+
+    ImGui::BeginChild("dashboard_header", ImVec2(0.0f, 48.0f), true);
+    ImGui::AlignTextToFramePadding();
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f);
+    ImGui::TextUnformatted("mc internal");
+
+    constexpr std::array<ModuleCategory, 4> kCategories = {ModuleCategory::kCombat,
+                                                           ModuleCategory::kVisuals,
+                                                           ModuleCategory::kMovement,
+                                                           ModuleCategory::kMisc};
+
+    float category_offset = 170.0f;
+    for (ModuleCategory category : kCategories) {
+      ImGui::SameLine(category_offset);
+
+      // cache the selected state so push and pop are perfectly balanced!
+      const bool is_selected = (selected_category == category);
+
+      if (is_selected) { ImGui::PushStyleColor(ImGuiCol_Text, kSelectedCategoryColor); }
+
+      if (ImGui::Selectable(ToDisplayName(category), is_selected, 0, ImVec2(96.0f, 28.0f))) {
+        selected_category = category;
+      }
+
+      if (is_selected) { ImGui::PopStyleColor(); }
+
+      category_offset += 104.0f;
+    }
+    ImGui::EndChild();
+
+    ImGui::Spacing();
+
+    ImGui::BeginChild(
+        "dashboard_content", ImVec2(0.0f, 0.0f), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    ImGui::TextDisabled("category");
+    ImGui::SameLine();
+    ImGui::TextUnformatted(ToDisplayName(selected_category));
+    ImGui::Spacing();
+
+    bool rendered_any_module = false;
+    for (const auto& module : ctx.module_manager.get_modules()) {
+      if (module->get_category() != selected_category) { continue; }
+
+      rendered_any_module = true;
+      const ImVec2 available = ImGui::GetContentRegionAvail();
+
+      // safely isolate this module's widgets to avoid checkbox ID collisions
+      ImGui::PushID(module.get());
+
+      if (ImGui::BeginChild("module_card",
+                            ImVec2(available.x, 0.0f),
+                            ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
+                            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+        bool enabled = module->is_enabled();
+        if (ImGui::Checkbox(module->get_name(), &enabled)) { module->toggle(); }
+
+        if (module->get_description() != nullptr) {
+          ImGui::SameLine();
+          ImGui::TextDisabled("%s", module->get_description());
+        }
+
+        if (module->is_enabled()) {
+          ImGui::Separator();
+          module->on_render_settings(ctx);
+        }
+      }
+      ImGui::EndChild();
+      ImGui::PopID();
+      ImGui::Spacing();
+    }
+
+    if (!rendered_any_module) { ImGui::TextDisabled("nothing is registered in this category yet"); }
+
+    ImGui::EndChild();
     ImGui::End();
   }
 

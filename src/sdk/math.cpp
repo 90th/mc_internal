@@ -40,6 +40,8 @@ bool WorldToScreen(const Vec3& world_pos,
   const float ndc_x = clip[0] / clip[3];
   const float ndc_y = clip[1] / clip[3];
 
+  if (ndc_x < -1.f || ndc_x > 1.f || ndc_y < -1.f || ndc_y > 1.f) { return false; }
+
   out_screen_pos.x = (ndc_x * 0.5f + 0.5f) * static_cast<float>(screen_width);
   out_screen_pos.y = (1.0f - (ndc_y * 0.5f + 0.5f)) * static_cast<float>(screen_height);
   return std::isfinite(out_screen_pos.x) && std::isfinite(out_screen_pos.y);
