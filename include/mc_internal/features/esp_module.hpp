@@ -16,6 +16,9 @@ class EspModule : public Module {
  private:
   float max_render_distance_ = 256.0f;
   bool show_players_ = true;
+  bool show_hostiles_ = true;
+  bool show_passives_ = false;
+  bool show_items_ = false;
   std::array<float, 4> esp_color_ = {0.86f, 0.15f, 0.15f, 1.0f};
 };
 

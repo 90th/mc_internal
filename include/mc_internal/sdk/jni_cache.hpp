@@ -28,6 +28,9 @@ struct JniCache {
   jclass joml_matrix4f_class = nullptr;
   jclass java_lang_iterable_class = nullptr;
   jclass java_util_iterator_class = nullptr;
+  jclass hostile_entity_class = nullptr;
+  jclass passive_entity_class = nullptr;
+  jclass item_entity_class = nullptr;
 
   jmethodID minecraft_client_get_instance = nullptr;
   jfieldID minecraft_client_player_field = nullptr;

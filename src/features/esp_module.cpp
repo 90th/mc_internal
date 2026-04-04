@@ -124,6 +124,27 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
     ImGui::TableNextRow();
     ImGui::TableSetColumnIndex(0);
     ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("");
+    ImGui::TableSetColumnIndex(1);
+    ImGui::Checkbox("show hostiles", &show_hostiles_);
+
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("");
+    ImGui::TableSetColumnIndex(1);
+    ImGui::Checkbox("show passives", &show_passives_);
+
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("");
+    ImGui::TableSetColumnIndex(1);
+    ImGui::Checkbox("show items", &show_items_);
+
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("max distance");
     if (ImGui::IsItemHovered()) { ImGui::SetTooltip("this trims visual noise and draw cost"); }
     ImGui::TableSetColumnIndex(1);
@@ -157,7 +178,9 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
 }
 
 void EspModule::on_render_3d(const OverlayContext& ctx) {
-  if (!show_players_ || ctx.display_width <= 0 || ctx.display_height <= 0) { return; }
+  // early exit if no entity types are enabled or viewport is invalid
+  if (!show_players_ && !show_hostiles_ && !show_passives_ && !show_items_) { return; }
+  if (ctx.display_width <= 0 || ctx.display_height <= 0) { return; }
 
   const auto attachment = AttachCurrentThread(ctx.jvm);
   if (!attachment) { return; }
@@ -201,18 +224,16 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
   const ImU32 esp_color = ImGui::ColorConvertFloat4ToU32(
       ImVec4(esp_color_[0], esp_color_[1], esp_color_[2], esp_color_[3]));
   ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
+
   for (auto entity : ClientWorld::GetEntities(env, ctx.jni_cache, world.get())) {
     if (!entity) { continue; }
     if (local_player && env->IsSameObject(entity.get(), local_player.get()) == JNI_TRUE) {
       continue;
     }
 
-    const EntityData entity_data = Entity::GetData(env, ctx.jni_cache, entity.get());
-    if (!entity_data.is_alive) { continue; }
-
-    const double entity_x = Lerp(entity_data.prev_x, entity_data.x, tick_delta);
-    const double entity_y = Lerp(entity_data.prev_y, entity_data.y, tick_delta);
-    const double entity_z = Lerp(entity_data.prev_z, entity_data.z, tick_delta);
+    // extract coordinates first for early distance culling (3 jni calls).
+    // avoids 6+ jni calls per entity when distance check fails.
+    auto [entity_x, entity_y, entity_z] = Entity::GetCoordinates(env, ctx.jni_cache, entity.get());
 
     const double dx = entity_x - camera_position.x;
     const double dy = entity_y - camera_position.y;
@@ -220,9 +241,33 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
     const double distance_sq = dx * dx + dy * dy + dz * dz;
     if (distance_sq > max_render_distance_sq) { continue; }
 
-    const Vec3 feet = {entity_x, entity_y, entity_z};
+    // apply entity type filters using IsInstanceOf.
+    bool should_draw = false;
+    if (show_players_ &&
+        env->IsInstanceOf(entity.get(), ctx.jni_cache.client_player_entity_class)) {
+      should_draw = true;
+    } else if (show_hostiles_ &&
+               env->IsInstanceOf(entity.get(), ctx.jni_cache.hostile_entity_class)) {
+      should_draw = true;
+    } else if (show_passives_ &&
+               env->IsInstanceOf(entity.get(), ctx.jni_cache.passive_entity_class)) {
+      should_draw = true;
+    } else if (show_items_ && env->IsInstanceOf(entity.get(), ctx.jni_cache.item_entity_class)) {
+      should_draw = true;
+    }
+    if (!should_draw) { continue; }
+
+    // now fetch the full entity data for rendering (is_alive, prev_pos, height).
+    const EntityData entity_data = Entity::GetData(env, ctx.jni_cache, entity.get());
+    if (!entity_data.is_alive) { continue; }
+
+    const double lerped_x = Lerp(entity_data.prev_x, entity_x, tick_delta);
+    const double lerped_y = Lerp(entity_data.prev_y, entity_y, tick_delta);
+    const double lerped_z = Lerp(entity_data.prev_z, entity_z, tick_delta);
+
+    const Vec3 feet = {lerped_x, lerped_y, lerped_z};
     const Vec3 head = {
-        entity_x, entity_y + static_cast<double>(entity_data.height) + 0.2, entity_z};
+        lerped_x, lerped_y + static_cast<double>(entity_data.height) + 0.2, lerped_z};
 
     Vec2 feet_screen = {};
     Vec2 head_screen = {};
