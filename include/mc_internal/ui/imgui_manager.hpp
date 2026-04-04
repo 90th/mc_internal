@@ -9,7 +9,4 @@ namespace mc_internal {
 // Returns true if ImGui is ready to render.
 [[nodiscard]] bool EnsureImGuiInitialized(OverlayContext& ctx);
 
-// Builds the font atlas texture and logs its dimensions.
-void ForceBuildAndLogFontAtlasTexture();
-
 }  // namespace mc_internal

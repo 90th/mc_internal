@@ -111,12 +111,34 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindSampler(0, 0);
 
+  // neutralize all unpack state the game may leave dirty.
+  // imgui's UpdateTexture only resets ROW_LENGTH and ALIGNMENT —
+  // leftover SKIP_PIXELS / SKIP_ROWS / SWAP_BYTES from lwjgl will
+  // shift or byte-swap glyph regions in the font atlas texture.
+  GLint last_pbo = 0;
+  glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &last_pbo);
+  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
+  GLint last_skip_pixels = 0;
+  GLint last_skip_rows = 0;
+  GLboolean last_swap_bytes = GL_FALSE;
+  glGetIntegerv(GL_UNPACK_SKIP_PIXELS, &last_skip_pixels);
+  glGetIntegerv(GL_UNPACK_SKIP_ROWS, &last_skip_rows);
+  glGetBooleanv(GL_UNPACK_SWAP_BYTES, &last_swap_bytes);
+  glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+  glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+  glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE);
+
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
   if (last_enable_primitive_restart) { glEnable(GL_PRIMITIVE_RESTART); }
   glActiveTexture(last_active_texture);
   glBindTexture(GL_TEXTURE_2D, last_texture);
   glBindSampler(0, last_sampler);
+  glPixelStorei(GL_UNPACK_SKIP_PIXELS, last_skip_pixels);
+  glPixelStorei(GL_UNPACK_SKIP_ROWS, last_skip_rows);
+  glPixelStorei(GL_UNPACK_SWAP_BYTES, last_swap_bytes);
+  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, static_cast<GLuint>(last_pbo));
   glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(last_fbo));
 
   if (g_original_swap_buffers != nullptr) { g_original_swap_buffers(window); }
