@@ -9,6 +9,7 @@
 #include "mc_internal/core/jvm_attachment.hpp"
 #include "mc_internal/sdk/math.hpp"
 #include "mc_internal/sdk/minecraft.hpp"
+#include "mc_internal/ui/widgets.hpp"
 
 namespace mc_internal {
 
@@ -127,11 +128,11 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
     if (ImGui::IsItemHovered()) { ImGui::SetTooltip("this trims visual noise and draw cost"); }
     ImGui::TableSetColumnIndex(1);
     ImGui::PushItemWidth(-1.0f);
-    ImGui::SliderFloat("##esp_max_render_distance",
-                       &max_render_distance_,
-                       kMinRenderDistance,
-                       kMaxRenderDistance,
-                       "%.0f blocks");
+    ui::SliderFloat("##esp_max_render_distance",
+                    &max_render_distance_,
+                    kMinRenderDistance,
+                    kMaxRenderDistance,
+                    "%.0f blocks");
     ImGui::PopItemWidth();
 
     ImGui::TableNextRow();

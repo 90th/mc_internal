@@ -14,7 +14,7 @@ namespace mc_internal {
 // maintaining their own module-level statics.
 struct OverlayContext {
   JavaVM* jvm = nullptr;
-  bool show_menu = true;
+  bool show_menu = false;
   GLFWwindow* pinned_window = nullptr;
   int window_width = 0;
   int window_height = 0;

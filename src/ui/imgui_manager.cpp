@@ -1,8 +1,15 @@
 #include "mc_internal/ui/imgui_manager.hpp"
 
 #include <cstdio>
+#include <cstring>
 #include <print>
 #include <string_view>
+
+#ifndef GL_GLEXT_PROTOTYPES
+#define GL_GLEXT_PROTOTYPES
+#endif
+#include <GL/gl.h>
+#include <GL/glext.h>
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -156,26 +163,11 @@ bool EnsureImGuiInitialized(OverlayContext& ctx) {
     }
   }
 
-  ForceBuildAndLogFontAtlasTexture();
   DarkTheme();
 
   ctx.imgui_initialized = true;
   PrintStatus("imgui initialized purely via opengl");
   return true;
-}
-
-void ForceBuildAndLogFontAtlasTexture() {
-  ImGuiIO& io = ImGui::GetIO();
-
-  unsigned char* pixels = nullptr;
-  int atlas_width = 0;
-  int atlas_height = 0;
-  int atlas_bpp = 0;
-  io.Fonts->GetTexDataAsRGBA32(&pixels, &atlas_width, &atlas_height, &atlas_bpp);
-
-  std::println(
-      "{} font atlas prepared ({}x{}x{})", kLogPrefix, atlas_width, atlas_height, atlas_bpp);
-  std::fflush(stdout);
 }
 
 }  // namespace mc_internal

@@ -57,6 +57,23 @@ int LocateLwjglGlfwCallback(struct dl_phdr_info* info, size_t, void* data) {
   void* handle = dlopen(info->dlpi_name, RTLD_NOLOAD | RTLD_LAZY);
   if (!handle) { return 0; }
 
+  // THE FIX: We force a GLFW function that requires initialization.
+  // If the library is uninitialized (or a Wayland/X11 ghost), it catches the
+  // error internally and we skip it, waiting for Minecraft to boot the real one.
+  using GlfwGetCurrentContextFn = GLFWwindow* (*)();
+  using GlfwGetErrorFn = int (*)(const char**);
+  auto get_current_context = (GlfwGetCurrentContextFn)dlsym(handle, "glfwGetCurrentContext");
+  auto get_error = (GlfwGetErrorFn)dlsym(handle, "glfwGetError");
+
+  if (get_current_context != nullptr && get_error != nullptr) {
+    get_current_context();  // Triggers GLFW_NOT_INITIALIZED if the library is not active.
+
+    const char* desc = nullptr;
+    if (get_error(&desc) == 0x00010001) {  // 0x00010001 is GLFW_NOT_INITIALIZED
+      return 0;                            // Skip this uninitialized ghost library cunt!
+    }
+  }
+
   GlfwFunctions functions{};
   functions.get_framebuffer_size =
       (GlfwGetFramebufferSizeFn)dlsym(handle, "glfwGetFramebufferSize");

@@ -18,6 +18,7 @@ struct OpenGlBootstrapState {
   GLint unpack_skip_pixels = 0;
   GLint unpack_alignment = 4;
   GLint unpack_skip_images = 0;
+  GLint unpack_image_height = 0;
   GLint unpack_swap_bytes = 0;
   GLint unpack_lsb_first = 0;
 };
