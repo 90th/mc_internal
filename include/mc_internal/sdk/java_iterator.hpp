@@ -113,6 +113,8 @@ class JavaIterable {
   static_assert(std::is_convertible_v<T, jobject>);
 
  public:
+  JavaIterable() = default;
+
   JavaIterable(const JniEnv& env, const JniCache& cache, jobject iterable_object)
       : env_(env), cache_(&cache), iterable_object_(env.TakeLocal(iterable_object)) {}
 

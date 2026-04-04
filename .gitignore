@@ -25,3 +25,5 @@ lib*.ar
 Thumbs.db
 
 !.gitkeep
+
+.cache/

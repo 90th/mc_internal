@@ -85,11 +85,11 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
   }
   io.DeltaTime = 1.0f / 60.0f;
 
-  ResetOpenGlStateForImGuiBootstrap();
   ImGui_ImplOpenGL3_NewFrame();
   ImGui::NewFrame();
 
   ProcessInput(window, *g_ctx);
+  g_ctx->module_manager.Render3d(*g_ctx);
   RenderMenu(window, *g_ctx);
 
   ImGui::Render();

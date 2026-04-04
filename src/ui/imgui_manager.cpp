@@ -16,6 +16,18 @@ namespace {
 
 constexpr std::string_view kDefaultGlslVersion = "#version 150";
 
+class ScopedImGuiBootstrapState {
+ public:
+  ScopedImGuiBootstrapState() : state_(PrepareOpenGlStateForImGuiBootstrap()) {}
+  ~ScopedImGuiBootstrapState() { RestoreOpenGlStateAfterImGuiBootstrap(state_); }
+
+  ScopedImGuiBootstrapState(const ScopedImGuiBootstrapState&) = delete;
+  ScopedImGuiBootstrapState& operator=(const ScopedImGuiBootstrapState&) = delete;
+
+ private:
+  OpenGlBootstrapState state_{};
+};
+
 }  // namespace
 
 bool EnsureImGuiInitialized(OverlayContext& ctx) {
@@ -37,7 +49,6 @@ bool EnsureImGuiInitialized(OverlayContext& ctx) {
   platform_io.Platform_GetClipboardTextFn = nullptr;
   platform_io.Platform_SetImeDataFn = nullptr;
 
-  ResetOpenGlStateForImGuiBootstrap();
   if (!ImGui_ImplOpenGL3_Init(kDefaultGlslVersion.data())) {
     ctx.imgui_init_failed = true;
     ImGui::DestroyContext();
@@ -45,16 +56,17 @@ bool EnsureImGuiInitialized(OverlayContext& ctx) {
     return false;
   }
 
-  ResetOpenGlStateForImGuiBootstrap();
-  if (!ImGui_ImplOpenGL3_CreateDeviceObjects()) {
-    ctx.imgui_init_failed = true;
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui::DestroyContext();
-    PrintStatus("imgui device object creation failed on the render thread");
-    return false;
+  {
+    ScopedImGuiBootstrapState scoped_bootstrap_state;
+    if (!ImGui_ImplOpenGL3_CreateDeviceObjects()) {
+      ctx.imgui_init_failed = true;
+      ImGui_ImplOpenGL3_Shutdown();
+      ImGui::DestroyContext();
+      PrintStatus("imgui device object creation failed on the render thread");
+      return false;
+    }
   }
 
-  ResetOpenGlStateForImGuiBootstrap();
   ForceBuildAndLogFontAtlasTexture();
 
   ctx.imgui_initialized = true;

@@ -13,7 +13,6 @@
 namespace mc_internal {
 
 static void BootstrapImpl(JavaVM* jvm) {
-  std::this_thread::sleep_for(std::chrono::seconds(15));
   PrintStatus("bootstrap thread started via jvmti");
 
   auto attachment = AttachCurrentThread(jvm);
@@ -31,12 +30,23 @@ static void BootstrapImpl(JavaVM* jvm) {
 
   std::println("{} jnihook ready", kLogPrefix);
 
-  if (const auto render_hook = InstallRenderHook(attachment->jvm()); !render_hook) {
-    PrintFailure("render hook", render_hook.error());
-    return;
+  for (int attempt = 1; attempt <= 60; ++attempt) {
+    if (const auto render_hook = InstallRenderHook(attachment->jvm()); render_hook) {
+      PrintStatus("render hook installed");
+      return;
+    } else if (render_hook.error() != BootstrapError::kSwapBuffersLookupFailed) {
+      PrintFailure("render hook", render_hook.error());
+      return;
+    }
+
+    if (attempt < 60) {
+      std::println("{} render hook waiting for glfw (attempt {}/60)", kLogPrefix, attempt);
+      std::fflush(stdout);
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
   }
 
-  PrintStatus("render hook installed");
+  PrintFailure("render hook", BootstrapError::kSwapBuffersLookupFailed);
 }
 
 void Bootstrap(JavaVM* jvm) {

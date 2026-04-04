@@ -17,13 +17,16 @@ void ProcessInput(GLFWwindow* window, OverlayContext& ctx) {
   if (insert_is_down && !ctx.insert_was_down) {
     ctx.show_menu = !ctx.show_menu;
 
-    // stash the game's cursor state when opening, restore it when closing
-    // to prevent breaking the game's camera lock
     if (ctx.show_menu) {
       if (glfw.get_input_mode != nullptr) {
         ctx.original_cursor_mode = glfw.get_input_mode(window, GLFW_CURSOR);
       }
+      // FIX: Only hide the OS cursor ONCE when the menu opens, preventing Wayland spam.
+      if (glfw.set_input_mode != nullptr) {
+        glfw.set_input_mode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+      }
     } else {
+      // Restore the game's cursor mode ONCE when the menu closes.
       if (glfw.set_input_mode != nullptr) {
         glfw.set_input_mode(window, GLFW_CURSOR, ctx.original_cursor_mode);
       }
@@ -34,11 +37,6 @@ void ProcessInput(GLFWwindow* window, OverlayContext& ctx) {
   ctx.insert_was_down = insert_is_down;
 
   if (ctx.show_menu) {
-    // hidden cursor mode allows unconstrained movement without the OS cursor rendering
-    if (glfw.set_input_mode != nullptr) {
-      glfw.set_input_mode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-    }
-
     double mouse_x = 0.0;
     double mouse_y = 0.0;
     glfw.get_cursor_pos(window, &mouse_x, &mouse_y);

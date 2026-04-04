@@ -12,6 +12,7 @@ struct OverlayContext;
 class ModuleManager {
  public:
   void Initialize() const;
+  void Render3d(const OverlayContext& ctx) const;
   void RenderUi(const OverlayContext& ctx) const;
 
  private:

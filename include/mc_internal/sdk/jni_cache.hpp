@@ -21,20 +21,39 @@ struct JniCache {
   jclass client_player_entity_class = nullptr;
   jclass client_world_class = nullptr;
   jclass entity_class = nullptr;
+  jclass game_renderer_class = nullptr;
+  jclass camera_class = nullptr;
+  jclass vec3d_class = nullptr;
+  jclass render_tick_counter_class = nullptr;
+  jclass joml_matrix4f_class = nullptr;
   jclass java_lang_iterable_class = nullptr;
   jclass java_util_iterator_class = nullptr;
 
   jmethodID minecraft_client_get_instance = nullptr;
   jfieldID minecraft_client_player_field = nullptr;
   jfieldID minecraft_client_world_field = nullptr;
+  jfieldID minecraft_client_game_renderer_field = nullptr;
+  jmethodID minecraft_client_get_render_tick_counter = nullptr;
   jmethodID client_world_get_entities = nullptr;
 
   jmethodID entity_get_x = nullptr;
   jmethodID entity_get_y = nullptr;
   jmethodID entity_get_z = nullptr;
+  jmethodID entity_is_alive = nullptr;
+  jmethodID entity_get_last_render_pos = nullptr;
+  jmethodID entity_get_height = nullptr;
+  jmethodID game_renderer_get_camera = nullptr;
+  jmethodID game_renderer_get_fov = nullptr;
+  jmethodID camera_get_pitch = nullptr;
+  jmethodID camera_get_yaw = nullptr;
+  jmethodID render_tick_counter_get_tick_progress = nullptr;
   jmethodID iterable_iterator = nullptr;
   jmethodID iterator_has_next = nullptr;
   jmethodID iterator_next = nullptr;
+  jfieldID camera_pos_field = nullptr;
+  jfieldID vec3d_x_field = nullptr;
+  jfieldID vec3d_y_field = nullptr;
+  jfieldID vec3d_z_field = nullptr;
 
  private:
   void Reset(JNIEnv* env) noexcept;
