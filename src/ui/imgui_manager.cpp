@@ -81,7 +81,6 @@ void ApplyTheme() {
   c[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.32f, 0.32f, 0.36f, 1.00f);
   c[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.40f, 0.40f, 0.44f, 1.00f);
 
-  // accent: warm red
   const ImVec4 accent(0.78f, 0.24f, 0.24f, 1.00f);
   const ImVec4 accent_hover(0.88f, 0.30f, 0.30f, 1.00f);
   const ImVec4 accent_active(0.68f, 0.20f, 0.20f, 1.00f);

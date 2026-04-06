@@ -24,6 +24,13 @@ using GlfwGetInputModeFn = int (*)(GLFWwindow*, int);
 using GlfwGetTimeFn = double (*)();
 using GlfwSetErrorCallbackFn = GLFWerrorfun (*)(GLFWerrorfun);
 
+// Callback setter function types used by the input suppression layer.
+using GlfwSetCursorPosCallbackFn = GLFWcursorposfun (*)(GLFWwindow*, GLFWcursorposfun);
+using GlfwSetKeyCallbackFn = GLFWkeyfun (*)(GLFWwindow*, GLFWkeyfun);
+using GlfwSetMouseButtonCallbackFn = GLFWmousebuttonfun (*)(GLFWwindow*, GLFWmousebuttonfun);
+using GlfwSetCharCallbackFn = GLFWcharfun (*)(GLFWwindow*, GLFWcharfun);
+using GlfwSetScrollCallbackFn = GLFWscrollfun (*)(GLFWwindow*, GLFWscrollfun);
+
 // All dynamically resolved GLFW entry points needed by the overlay.
 struct GlfwFunctions {
   GlfwGetFramebufferSizeFn get_framebuffer_size = nullptr;
@@ -36,6 +43,14 @@ struct GlfwFunctions {
   GlfwGetInputModeFn get_input_mode = nullptr;
   GlfwGetTimeFn get_time = nullptr;
   GlfwSetErrorCallbackFn set_error_callback = nullptr;
+
+  // Callback setters resolved for input suppression (optional — not
+  // required for core overlay operation).
+  GlfwSetCursorPosCallbackFn set_cursor_pos_callback = nullptr;
+  GlfwSetKeyCallbackFn set_key_callback = nullptr;
+  GlfwSetMouseButtonCallbackFn set_mouse_button_callback = nullptr;
+  GlfwSetCharCallbackFn set_char_callback = nullptr;
+  GlfwSetScrollCallbackFn set_scroll_callback = nullptr;
 };
 
 // Bundles the result of a successful LWJGL GLFW module scan.

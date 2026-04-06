@@ -31,9 +31,11 @@ void ProcessInput(GLFWwindow* window, OverlayContext& ctx) {
         ctx.original_cursor_mode = glfw.get_input_mode(window, GLFW_CURSOR);
       }
 
-      // normal cursor mode breaks the game's camera lock and gives imgui the real pointer.
+      // Hidden cursor mode breaks the game's camera lock so ImGui gets the
+      // real pointer, while keeping the OS cursor invisible (the overlay
+      // draws its own custom cursor).
       if (glfw.set_input_mode != nullptr) {
-        glfw.set_input_mode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        glfw.set_input_mode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
       }
 
       io.AddMouseButtonEvent(0, false);
@@ -54,6 +56,12 @@ void ProcessInput(GLFWwindow* window, OverlayContext& ctx) {
   ctx.insert_was_down = insert_is_down;
 
   if (ctx.show_menu) {
+    // Per-frame override: prevent the game from re-grabbing the cursor while
+    // the menu is open (replaces the removed glfwSetInputMode inline hook).
+    if (glfw.set_input_mode != nullptr) {
+      glfw.set_input_mode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+    }
+
     double mouse_x = 0.0;
     double mouse_y = 0.0;
     glfw.get_cursor_pos(window, &mouse_x, &mouse_y);

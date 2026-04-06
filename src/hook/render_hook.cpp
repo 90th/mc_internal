@@ -21,6 +21,7 @@
 
 #include "mc_internal/context.hpp"
 #include "mc_internal/hook/glfw_bindings.hpp"
+#include "mc_internal/hook/input_suppression.hpp"
 #include "mc_internal/ui/imgui_manager.hpp"
 #include "mc_internal/ui/input_handler.hpp"
 #include "mc_internal/ui/menu.hpp"
@@ -74,6 +75,9 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
     g_ctx->pinned_window = window;
     std::println("{} pinned overlay window {}", kLogPrefix, static_cast<const void*>(window));
     std::fflush(stdout);
+
+    InstallInputSuppression(*g_ctx);
+    CaptureGameCallbacks(window);
   }
 
   if (window != g_ctx->pinned_window) {

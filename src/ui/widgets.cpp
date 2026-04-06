@@ -38,14 +38,12 @@ bool Tab(const char* label, bool selected) {
   bool hovered, held;
   const bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
 
-  // animated text color: blend between base and accent based on selection
   const float ct = Anim::Get(id + 0x10000, selected ? 1.0f : 0.0f, 8.0f);
   const ImU32 text_color = LerpColor(hovered ? kTextBright : kTextMid, kAccent, ct);
 
   const ImVec2 text_pos = ImVec2(pos.x + 7.0f, pos.y + 4.0f);
   window->DrawList->AddText(text_pos, text_color, label);
 
-  // animated underline alpha
   const float ul = Anim::Get(id + 0x20000, selected ? 1.0f : 0.0f, 8.0f);
   if (ul > 0.01f) {
     const ImU32 ul_color = IM_COL32(200, 60, 60, static_cast<int>(255.0f * ul));
@@ -66,7 +64,6 @@ bool SliderFloat(const char* label, float* v, float v_min, float v_max, const ch
   const ImGuiID id = window->GetID(label);
   const float width = ImGui::CalcItemWidth();
 
-  // thinner track for a cleaner look
   constexpr float kTrackHeight = 6.0f;
   constexpr float kGrabRadius = 5.0f;
   const float total_height = kTrackHeight + kGrabRadius * 2.0f + 4.0f;
@@ -92,7 +89,6 @@ bool SliderFloat(const char* label, float* v, float v_min, float v_max, const ch
 
   if (value_changed) { ImGui::MarkItemEdited(id); }
 
-  // draw track centered vertically
   const float track_y = bb.Min.y + (total_height - kTrackHeight) * 0.5f;
   const ImRect track_bb(ImVec2(bb.Min.x, track_y), ImVec2(bb.Max.x, track_y + kTrackHeight));
   const float track_rounding = kTrackHeight * 0.5f;
@@ -150,7 +146,6 @@ bool Toggle(const char* label, bool* v) {
   const ImVec2 track_min(pos.x, track_y);
   const ImVec2 track_max(pos.x + kToggleW, track_y + kToggleH);
 
-  // animated knob position and track color
   const float t = Anim::Get(id, *v ? 1.0f : 0.0f, 8.0f);
   const ImU32 track_color = LerpColor(kToggleOff, kAccent, t);
   window->DrawList->AddRectFilled(track_min, track_max, track_color, kRounding);

@@ -83,6 +83,7 @@ target_sources(mc_internal PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/logging.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hook/glfw_bindings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/hook/input_suppression.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hook/render_hook.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/jvm_attachment.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/jni_hook.cpp

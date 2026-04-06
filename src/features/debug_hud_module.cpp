@@ -34,7 +34,6 @@ DebugHudModule::DebugHudModule()
     : Module("debug hud", "displays the local player coordinates", ModuleCategory::kMisc) {}
 
 void DebugHudModule::on_render_ui(const OverlayContext& ctx) {
-  // fade in/out like menu_alpha
   static float hud_alpha = 0.0f;
   hud_alpha += (is_enabled() ? 1.0f : -1.0f) * ImGui::GetIO().DeltaTime * 10.0f;
   hud_alpha = std::clamp(hud_alpha, 0.0f, 1.0f);

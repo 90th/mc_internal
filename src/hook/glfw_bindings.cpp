@@ -69,6 +69,14 @@ int LocateLwjglGlfwCallback(struct dl_phdr_info* info, size_t, void* data) {
   functions.get_time = (GlfwGetTimeFn)dlsym(handle, "glfwGetTime");
   functions.set_error_callback = (GlfwSetErrorCallbackFn)dlsym(handle, "glfwSetErrorCallback");
 
+  functions.set_cursor_pos_callback =
+      (GlfwSetCursorPosCallbackFn)dlsym(handle, "glfwSetCursorPosCallback");
+  functions.set_key_callback = (GlfwSetKeyCallbackFn)dlsym(handle, "glfwSetKeyCallback");
+  functions.set_mouse_button_callback =
+      (GlfwSetMouseButtonCallbackFn)dlsym(handle, "glfwSetMouseButtonCallback");
+  functions.set_char_callback = (GlfwSetCharCallbackFn)dlsym(handle, "glfwSetCharCallback");
+  functions.set_scroll_callback = (GlfwSetScrollCallbackFn)dlsym(handle, "glfwSetScrollCallback");
+
   void* swap_addr = dlsym(handle, "glfwSwapBuffers");
   if (!swap_addr || !HasRequiredFunctions(functions)) {
     dlclose(handle);

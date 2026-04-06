@@ -162,7 +162,6 @@ void RenderMenu(GLFWwindow* window, const OverlayContext& ctx) {
     static bool indicator_initialized = false;
     float target_offset = 0.0f;
 
-    // find the target offset for the selected category
     {
       float off = 0.0f;
       for (ModuleCategory category : kCategories) {
@@ -216,7 +215,6 @@ void RenderMenu(GLFWwindow* window, const OverlayContext& ctx) {
       btn_y += kBtnHeight + kBtnPad;
     }
 
-    // draw the sliding accent indicator at the animated Y
     const float ind_y = btn_y_start + indicator_offset;
     dl->AddRectFilled(ImVec2(sidebar_min.x + 6.0f, ind_y + 3.0f),
                       ImVec2(sidebar_min.x + 6.0f + 3.0f, ind_y + kBtnHeight - 3.0f),
