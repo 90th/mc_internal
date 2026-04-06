@@ -19,14 +19,13 @@ void DebugHudModule::on_render_ui(const OverlayContext& ctx) {
 
   ImGui::Begin("debug hud");
 
-  const auto attachment = AttachCurrentThread(ctx.jvm);
-  if (!attachment) {
+  if (!ctx.jvm_attachment) {
     ImGui::TextUnformatted("player: jni unavailable");
     ImGui::End();
     return;
   }
 
-  const JniEnv env(attachment->env());
+  const JniEnv env(ctx.jvm_attachment->env());
   if (!ctx.jni_cache.Initialize(env)) {
     ImGui::TextUnformatted("player: jni cache unavailable");
     ImGui::End();

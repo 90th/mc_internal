@@ -1,7 +1,9 @@
 #pragma once
 
 #include <jni.h>
+#include <optional>
 
+#include "mc_internal/core/jvm_attachment.hpp"
 #include "mc_internal/features/module_manager.hpp"
 #include "mc_internal/hook/glfw_bindings.hpp"
 #include "mc_internal/sdk/jni_cache.hpp"
@@ -31,6 +33,11 @@ struct OverlayContext {
 
   // Dynamically resolved GLFW entry points.
   GlfwFunctions glfw{};
+
+  // Persistent JVM attachment for the render thread. Created once on first
+  // use and kept alive for the lifetime of the hook to avoid per-frame
+  // attach/detach overhead and thread corruption.
+  std::optional<JvmThreadAttachment> jvm_attachment;
 
   // Per-process JNI cache and feature registry used by the render thread.
   mutable JniCache jni_cache{};

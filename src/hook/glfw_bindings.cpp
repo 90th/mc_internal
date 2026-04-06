@@ -44,7 +44,7 @@ struct LookupCallbackData {
   return functions.get_framebuffer_size != nullptr && functions.get_window_size != nullptr &&
          functions.get_key != nullptr && functions.get_mouse_button != nullptr &&
          functions.get_cursor_pos != nullptr && functions.set_input_mode != nullptr &&
-         functions.get_input_mode != nullptr && functions.get_current_context != nullptr;
+         functions.set_cursor_pos != nullptr && functions.get_input_mode != nullptr;
 }
 
 int LocateLwjglGlfwCallback(struct dl_phdr_info* info, size_t, void* data) {
@@ -56,23 +56,6 @@ int LocateLwjglGlfwCallback(struct dl_phdr_info* info, size_t, void* data) {
   void* handle = dlopen(info->dlpi_name, RTLD_NOLOAD | RTLD_LAZY);
   if (!handle) { return 0; }
 
-  // THE FIX: We force a GLFW function that requires initialization.
-  // If the library is uninitialized (or a Wayland/X11 ghost), it catches the
-  // error internally and we skip it, waiting for Minecraft to boot the real one.
-  using GlfwGetCurrentContextFn = GLFWwindow* (*)();
-  using GlfwGetErrorFn = int (*)(const char**);
-  auto get_current_context = (GlfwGetCurrentContextFn)dlsym(handle, "glfwGetCurrentContext");
-  auto get_error = (GlfwGetErrorFn)dlsym(handle, "glfwGetError");
-
-  if (get_current_context != nullptr && get_error != nullptr) {
-    get_current_context();  // Triggers GLFW_NOT_INITIALIZED if the library is not active.
-
-    const char* desc = nullptr;
-    if (get_error(&desc) == 0x00010001) {  // 0x00010001 is GLFW_NOT_INITIALIZED
-      return 0;                            // Skip this uninitialized ghost library cunt!
-    }
-  }
-
   GlfwFunctions functions{};
   functions.get_framebuffer_size =
       (GlfwGetFramebufferSizeFn)dlsym(handle, "glfwGetFramebufferSize");
@@ -81,15 +64,24 @@ int LocateLwjglGlfwCallback(struct dl_phdr_info* info, size_t, void* data) {
   functions.get_mouse_button = (GlfwGetMouseButtonFn)dlsym(handle, "glfwGetMouseButton");
   functions.get_cursor_pos = (GlfwGetCursorPosFn)dlsym(handle, "glfwGetCursorPos");
   functions.set_input_mode = (GlfwSetInputModeFn)dlsym(handle, "glfwSetInputMode");
+  functions.set_cursor_pos = (GlfwSetCursorPosFn)dlsym(handle, "glfwSetCursorPos");
   functions.get_input_mode = (GlfwGetInputModeFn)dlsym(handle, "glfwGetInputMode");
-  functions.get_current_context = (GlfwGetCurrentContextFn)dlsym(handle, "glfwGetCurrentContext");
+  functions.get_time = (GlfwGetTimeFn)dlsym(handle, "glfwGetTime");
+  functions.set_error_callback = (GlfwSetErrorCallbackFn)dlsym(handle, "glfwSetErrorCallback");
 
   void* swap_addr = dlsym(handle, "glfwSwapBuffers");
-  if (!swap_addr || !HasRequiredFunctions(functions)) { return 0; }
+  if (!swap_addr || !HasRequiredFunctions(functions)) {
+    dlclose(handle);
+    return 0;
+  }
 
   auto* result = static_cast<LookupCallbackData*>(data);
-  if (score <= result->best_score) { return 0; }
+  if (score <= result->best_score) {
+    dlclose(handle);
+    return 0;
+  }
 
+  dlclose(handle);
   result->best_score = score;
   result->swap_buffers_address = swap_addr;
   result->functions = functions;

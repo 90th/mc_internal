@@ -19,8 +19,10 @@ using GlfwGetKeyFn = int (*)(GLFWwindow*, int);
 using GlfwGetMouseButtonFn = int (*)(GLFWwindow*, int);
 using GlfwGetCursorPosFn = void (*)(GLFWwindow*, double*, double*);
 using GlfwSetInputModeFn = void (*)(GLFWwindow*, int, int);
+using GlfwSetCursorPosFn = void (*)(GLFWwindow*, double, double);
 using GlfwGetInputModeFn = int (*)(GLFWwindow*, int);
-using GlfwGetCurrentContextFn = GLFWwindow* (*)();
+using GlfwGetTimeFn = double (*)();
+using GlfwSetErrorCallbackFn = GLFWerrorfun (*)(GLFWerrorfun);
 
 // All dynamically resolved GLFW entry points needed by the overlay.
 struct GlfwFunctions {
@@ -30,8 +32,10 @@ struct GlfwFunctions {
   GlfwGetMouseButtonFn get_mouse_button = nullptr;
   GlfwGetCursorPosFn get_cursor_pos = nullptr;
   GlfwSetInputModeFn set_input_mode = nullptr;
+  GlfwSetCursorPosFn set_cursor_pos = nullptr;
   GlfwGetInputModeFn get_input_mode = nullptr;
-  GlfwGetCurrentContextFn get_current_context = nullptr;
+  GlfwGetTimeFn get_time = nullptr;
+  GlfwSetErrorCallbackFn set_error_callback = nullptr;
 };
 
 // Bundles the result of a successful LWJGL GLFW module scan.
