@@ -122,18 +122,8 @@ EspModule::EspModule()
 void EspModule::on_render_settings(const OverlayContext& ctx) {
   static_cast<void>(ctx);
 
-  ImGui::AlignTextToFramePadding();
-  ImGui::TextUnformatted("entity boxes");
-  if (ImGui::IsItemHovered()) { ImGui::SetTooltip("baseline visuals"); }
+  ui::SectionHeader("target groups");
 
-  ImGui::Spacing();
-  ImGui::Separator();
-  ImGui::Spacing();
-
-  ImGui::TextUnformatted("target groups");
-  if (ImGui::IsItemHovered()) { ImGui::SetTooltip("pick which entities the esp should highlight"); }
-
-  ImGui::Spacing();
   RenderTargetGroupRow(
       "players", "##esp_players_color", &player_group_.enabled, &player_group_.color);
   RenderTargetGroupRow(
@@ -142,13 +132,8 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
       "passives", "##esp_passives_color", &passive_group_.enabled, &passive_group_.color);
   RenderTargetGroupRow("items", "##esp_items_color", &item_group_.enabled, &item_group_.color);
 
-  ImGui::Spacing();
-  ImGui::Separator();
-  ImGui::Spacing();
+  ui::SectionHeader("render distance");
 
-  ImGui::AlignTextToFramePadding();
-  ImGui::TextUnformatted("max distance");
-  if (ImGui::IsItemHovered()) { ImGui::SetTooltip("this trims visual noise and draw cost"); }
   ImGui::PushItemWidth(-1.0f);
   ui::SliderFloat("##esp_max_render_distance",
                   &max_render_distance_,
@@ -161,7 +146,6 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
 }
 
 void EspModule::on_render_3d(const OverlayContext& ctx) {
-  // skip the whole pass if every target group is disabled.
   if (!player_group_.enabled && !hostile_group_.enabled && !passive_group_.enabled &&
       !item_group_.enabled) {
     return;

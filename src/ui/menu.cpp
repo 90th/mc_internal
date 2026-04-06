@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <array>
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #include "mc_internal/features/module.hpp"
 #include "mc_internal/ui/widgets.hpp"
@@ -12,9 +14,24 @@ namespace mc_internal {
 
 namespace {
 
-constexpr float kHeaderHeight = 32.0f;
-constexpr float kTabWidthPadding = 16.0f;
-constexpr ImU32 kHeaderTitleColor = IM_COL32(180, 180, 180, 255);
+// ── layout constants ─────────────────────────────────────────────────────────
+constexpr float kSidebarWidth = 130.0f;
+constexpr float kHeaderHeight = 36.0f;
+constexpr float kCardRounding = 4.0f;
+
+// ── colors ───────────────────────────────────────────────────────────────────
+constexpr ImU32 kAccent = IM_COL32(200, 60, 60, 255);
+constexpr ImU32 kAccentSoft = IM_COL32(200, 60, 60, 40);
+constexpr ImU32 kTitleColor = IM_COL32(200, 60, 60, 255);
+constexpr ImU32 kTextBright = IM_COL32(220, 220, 220, 255);
+constexpr ImU32 kTextMid = IM_COL32(140, 140, 140, 255);
+constexpr ImU32 kTextDim = IM_COL32(90, 90, 90, 255);
+constexpr ImU32 kCardBg = IM_COL32(28, 29, 34, 255);
+constexpr ImU32 kCardBorder = IM_COL32(45, 46, 52, 255);
+constexpr ImU32 kSidebarBg = IM_COL32(22, 23, 27, 255);
+constexpr ImU32 kSidebarHover = IM_COL32(35, 36, 42, 255);
+constexpr ImU32 kSidebarActive = IM_COL32(200, 60, 60, 20);
+constexpr ImU32 kSeparator = IM_COL32(45, 46, 52, 255);
 
 const char* ToDisplayName(ModuleCategory category) {
   switch (category) {
@@ -30,6 +47,55 @@ const char* ToDisplayName(ModuleCategory category) {
   return "misc";
 }
 
+void RenderModuleCard(const std::unique_ptr<Module>& module, const OverlayContext& ctx) {
+  ImGuiWindow* window = ImGui::GetCurrentWindow();
+  const float avail_w = ImGui::GetContentRegionAvail().x;
+  ImGui::PushID(module.get());
+
+  ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, kCardRounding);
+  ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(kCardBg));
+  ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(kCardBorder));
+
+  if (ImGui::BeginChild("mod_card",
+                        ImVec2(avail_w, 0.0f),
+                        ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
+                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+    // ── card header ──
+    bool enabled = module->is_enabled();
+
+    if (ImGui::Checkbox(module->get_name(), &enabled)) { module->toggle(); }
+
+    if (module->get_description() != nullptr) {
+      ImGui::SameLine();
+      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(kTextDim));
+      const ImVec2 desc_size = ImGui::CalcTextSize(module->get_description(), nullptr, true);
+      const float space = ImGui::GetContentRegionAvail().x - desc_size.x;
+      if (space > 0.0f) { ImGui::SetCursorPosX(ImGui::GetCursorPosX() + space); }
+      ImGui::TextUnformatted(module->get_description());
+      ImGui::PopStyleColor();
+    }
+
+    // ── card body ──
+    if (module->is_enabled()) {
+      ImGui::Spacing();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 sep_start = ImGui::GetCursorScreenPos();
+      const float sep_w = ImGui::GetContentRegionAvail().x;
+      dl->AddLine(sep_start, ImVec2(sep_start.x + sep_w, sep_start.y), kSeparator, 1.0f);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      module->on_render_settings(ctx);
+    }
+  }
+  ImGui::EndChild();
+
+  ImGui::PopStyleColor(2);
+  ImGui::PopStyleVar();
+  ImGui::PopID();
+
+  ImGui::Spacing();
+}
+
 }  // namespace
 
 void RenderMenu(GLFWwindow* window, const OverlayContext& ctx) {
@@ -37,128 +103,149 @@ void RenderMenu(GLFWwindow* window, const OverlayContext& ctx) {
 
   static float menu_alpha = 0.0f;
 
-  // keep the menu transition soft without dragging the whole frame.
-  menu_alpha += (ctx.show_menu ? 1.0f : -1.0f) * ImGui::GetIO().DeltaTime * 12.0f;
+  menu_alpha += (ctx.show_menu ? 1.0f : -1.0f) * ImGui::GetIO().DeltaTime * 10.0f;
   menu_alpha = std::clamp(menu_alpha, 0.0f, 1.0f);
 
-  // keep world overlays alive even while the menu fades.
   ctx.module_manager.RenderUi(ctx);
 
-  // stop once the fade is effectively gone.
   if (menu_alpha <= 0.001f) { return; }
 
   static ModuleCategory selected_category = ModuleCategory::kVisuals;
 
+  // ── window setup ───────────────────────────────────────────────────────
+  const float menu_w = std::clamp(static_cast<float>(ctx.window_width) * 0.46f, 540.0f, 780.0f);
+  const float menu_h = std::clamp(static_cast<float>(ctx.window_height) * 0.52f, 340.0f, 520.0f);
   ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2(std::max(760.0f, static_cast<float>(ctx.window_width) * 0.58f),
-                                  std::max(460.0f, static_cast<float>(ctx.window_height) * 0.62f)),
-                           ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2(menu_w, menu_h), ImGuiCond_FirstUseEver);
 
-  // let the menu fade as one unit.
   ImGui::PushStyleVar(ImGuiStyleVar_Alpha, menu_alpha);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
-  ImGui::Begin("mc internal", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
+  ImGui::Begin("##mc_menu",
+               nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+                   ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-  constexpr std::array<ModuleCategory, 4> kCategories = {ModuleCategory::kCombat,
-                                                         ModuleCategory::kVisuals,
-                                                         ModuleCategory::kMovement,
-                                                         ModuleCategory::kMisc};
+  const ImVec2 win_pos = ImGui::GetWindowPos();
+  const ImVec2 win_size = ImGui::GetWindowSize();
+  ImDrawList* dl = ImGui::GetWindowDrawList();
 
-  const ImGuiStyle& style = ImGui::GetStyle();
-  float total_tabs_width = 0.0f;
-  for (ModuleCategory category : kCategories) {
-    total_tabs_width +=
-        ImGui::CalcTextSize(ToDisplayName(category), nullptr, true).x + kTabWidthPadding;
-  }
-  total_tabs_width += style.ItemSpacing.x * static_cast<float>(kCategories.size() - 1);
+  // ── sidebar ────────────────────────────────────────────────────────────
+  {
+    const ImVec2 sidebar_min = win_pos;
+    const ImVec2 sidebar_max(win_pos.x + kSidebarWidth, win_pos.y + win_size.y);
 
-  const ImVec2 title_size = ImGui::CalcTextSize("mc internal", nullptr, true);
-  const ImVec2 tab_label_size = ImGui::CalcTextSize("visuals", nullptr, true);
-  const float title_pos_y = (kHeaderHeight - title_size.y) * 0.5f;
-  const float tab_pos_y = (kHeaderHeight - (tab_label_size.y + 12.0f)) * 0.5f;
+    dl->AddRectFilled(sidebar_min, sidebar_max, kSidebarBg, 6.0f, ImDrawFlags_RoundCornersLeft);
 
-  // keep the header tight so the tabs feel intentional.
-  ImGui::BeginChild("dashboard_header",
-                    ImVec2(0.0f, kHeaderHeight),
-                    false,
-                    ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    const ImVec2 title_pos(sidebar_min.x + 14.0f, sidebar_min.y + 14.0f);
+    dl->AddText(title_pos, kTitleColor, "mc internal");
 
-  const ImVec2 header_origin = ImGui::GetCursorScreenPos();
-  ImGui::GetWindowDrawList()->AddText(
-      ImVec2(header_origin.x, header_origin.y + title_pos_y), kHeaderTitleColor, "mc internal");
+    const float sep_y = title_pos.y + ImGui::GetTextLineHeight() + 8.0f;
+    dl->AddLine(ImVec2(sidebar_min.x + 10.0f, sep_y),
+                ImVec2(sidebar_max.x - 10.0f, sep_y),
+                kSeparator,
+                1.0f);
 
-  const float header_width = ImGui::GetWindowWidth();
-  const float tab_start_x = header_width * 0.5f - total_tabs_width * 0.5f;
-  ImGui::SetCursorPos(ImVec2(tab_start_x, tab_pos_y));
+    constexpr std::array<ModuleCategory, 4> kCategories = {ModuleCategory::kCombat,
+                                                           ModuleCategory::kVisuals,
+                                                           ModuleCategory::kMovement,
+                                                           ModuleCategory::kMisc};
 
-  for (size_t index = 0; index < kCategories.size(); ++index) {
-    if (index > 0) { ImGui::SameLine(); }
+    float btn_y = sep_y + 10.0f;
+    constexpr float kBtnHeight = 26.0f;
+    constexpr float kBtnPad = 2.0f;
 
-    const ModuleCategory category = kCategories[index];
-    if (ui::Tab(ToDisplayName(category), selected_category == category)) {
-      selected_category = category;
-    }
-  }
-  ImGui::EndChild();
+    for (ModuleCategory category : kCategories) {
+      const char* name = ToDisplayName(category);
+      const bool is_selected = (category == selected_category);
+      const ImVec2 btn_min(sidebar_min.x + 6.0f, btn_y);
+      const ImVec2 btn_max(sidebar_max.x - 6.0f, btn_y + kBtnHeight);
 
-  ImGui::Spacing();
+      ImGui::SetCursorScreenPos(btn_min);
+      ImGui::PushID(static_cast<int>(category));
+      if (ImGui::InvisibleButton("##cat", ImVec2(btn_max.x - btn_min.x, kBtnHeight))) {
+        selected_category = category;
+      }
+      const bool hovered = ImGui::IsItemHovered();
+      ImGui::PopID();
 
-  ImGui::BeginChild(
-      "dashboard_content", ImVec2(0.0f, 0.0f), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
-
-  bool rendered_any_module = false;
-  for (const auto& module : ctx.module_manager.get_modules()) {
-    if (module->get_category() != selected_category) continue;
-
-    rendered_any_module = true;
-    const ImVec2 available = ImGui::GetContentRegionAvail();
-    ImGui::PushID(module.get());
-
-    if (ImGui::BeginChild("module_card",
-                          ImVec2(available.x, 0.0f),
-                          ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
-                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
-      bool enabled = module->is_enabled();
-
-      if (ImGui::Checkbox(module->get_name(), &enabled)) { module->toggle(); }
-
-      if (module->get_description() != nullptr) {
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", module->get_description());
+      if (is_selected) {
+        dl->AddRectFilled(btn_min, btn_max, kSidebarActive, 3.0f);
+        dl->AddRectFilled(ImVec2(btn_min.x, btn_min.y + 3.0f),
+                          ImVec2(btn_min.x + 3.0f, btn_max.y - 3.0f),
+                          kAccent,
+                          1.5f);
+      } else if (hovered) {
+        dl->AddRectFilled(btn_min, btn_max, kSidebarHover, 3.0f);
       }
 
-      if (module->is_enabled()) {
-        ImGui::Separator();
-        module->on_render_settings(ctx);
-      }
+      const ImVec2 text_size = ImGui::CalcTextSize(name, nullptr, true);
+      const ImVec2 text_pos(btn_min.x + 14.0f, btn_min.y + (kBtnHeight - text_size.y) * 0.5f);
+      dl->AddText(text_pos, is_selected ? kAccent : (hovered ? kTextBright : kTextMid), name);
+
+      btn_y += kBtnHeight + kBtnPad;
     }
-    ImGui::EndChild();
-    ImGui::PopID();
+  }
+
+  // ── vertical separator between sidebar and content ─────────────────────
+  dl->AddLine(ImVec2(win_pos.x + kSidebarWidth, win_pos.y + 8.0f),
+              ImVec2(win_pos.x + kSidebarWidth, win_pos.y + win_size.y - 8.0f),
+              kSeparator,
+              1.0f);
+
+  // ── content panel ──────────────────────────────────────────────────────
+  {
+    const float content_x = kSidebarWidth + 1.0f;
+    const float content_w = win_size.x - content_x;
+
+    ImGui::SetCursorScreenPos(ImVec2(win_pos.x + content_x, win_pos.y));
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
+    ImGui::BeginChild("##content",
+                      ImVec2(content_w, win_size.y),
+                      ImGuiChildFlags_AlwaysUseWindowPadding,
+                      ImGuiWindowFlags_None);
+
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(kTextDim));
+    ImGui::TextUnformatted(ToDisplayName(selected_category));
+    ImGui::PopStyleColor();
     ImGui::Spacing();
+
+    ImGui::BeginChild("##modules", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_None);
+
+    bool rendered_any = false;
+    for (const auto& module : ctx.module_manager.get_modules()) {
+      if (module->get_category() != selected_category) continue;
+      rendered_any = true;
+      RenderModuleCard(module, ctx);
+    }
+
+    if (!rendered_any) {
+      ImGui::Spacing();
+      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(kTextDim));
+      ImGui::TextUnformatted("no modules in this category");
+      ImGui::PopStyleColor();
+    }
+
+    ImGui::EndChild();
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
   }
 
-  if (!rendered_any_module) { ImGui::TextDisabled("nothing is registered in this category yet"); }
-
-  ImGui::EndChild();
   ImGui::End();
+  ImGui::PopStyleVar(2);
 
-  ImGui::PopStyleVar();
-
-  // keep the overlay cursor styling even when glfw cursor mode is managed separately.
+  // ── custom cursor ──────────────────────────────────────────────────────
   ImDrawList* fg = ImGui::GetForegroundDrawList();
-  const ImVec2 mouse_pos = ImGui::GetIO().MousePos;
-  const ImU32 cursor_color = IM_COL32(180, 20, 20, static_cast<int>(255.0f * menu_alpha));
-  const ImU32 border_color = IM_COL32(0, 0, 0, static_cast<int>(255.0f * menu_alpha));
+  const ImVec2 mp = ImGui::GetIO().MousePos;
+  const int alpha = static_cast<int>(255.0f * menu_alpha);
+  const ImU32 cursor_fill = IM_COL32(200, 60, 60, alpha);
+  const ImU32 cursor_edge = IM_COL32(0, 0, 0, alpha);
 
-  fg->AddTriangle(mouse_pos,
-                  ImVec2(mouse_pos.x + 13.0f, mouse_pos.y + 13.0f),
-                  ImVec2(mouse_pos.x, mouse_pos.y + 18.0f),
-                  border_color,
-                  1.5f);
-  fg->AddTriangleFilled(mouse_pos,
-                        ImVec2(mouse_pos.x + 13.0f, mouse_pos.y + 13.0f),
-                        ImVec2(mouse_pos.x, mouse_pos.y + 18.0f),
-                        cursor_color);
+  fg->AddTriangle(
+      mp, ImVec2(mp.x + 12.0f, mp.y + 12.0f), ImVec2(mp.x, mp.y + 16.0f), cursor_edge, 1.5f);
+  fg->AddTriangleFilled(
+      mp, ImVec2(mp.x + 12.0f, mp.y + 12.0f), ImVec2(mp.x, mp.y + 16.0f), cursor_fill);
 }
 
 }  // namespace mc_internal

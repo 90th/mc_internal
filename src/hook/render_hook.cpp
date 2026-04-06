@@ -125,10 +125,10 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
   GLint last_sampler = 0;
   glGetIntegerv(GL_SAMPLER_BINDING, &last_sampler);
 
-  // neutralize all unpack state the game may leave dirty.
-  // imgui's UpdateTexture only resets ROW_LENGTH and ALIGNMENT —
-  // leftover SKIP_PIXELS / SKIP_ROWS / SWAP_BYTES from lwjgl will
-  // shift or byte-swap glyph regions in the font atlas texture.
+  // neutralize all unpack state the game may leave dirty —
+  // imgui only resets ROW_LENGTH and ALIGNMENT, but leftover
+  // SKIP_PIXELS / SKIP_ROWS / SWAP_BYTES from lwjgl will
+  // corrupt the font atlas texture.
   GLint last_pbo = 0;
   glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &last_pbo);
 
@@ -180,7 +180,6 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, static_cast<GLuint>(last_pbo));
   glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(last_fbo));
 
-  // Restore GLFW error callback before handing control back.
   if (g_ctx->glfw.set_error_callback && prev_error_callback) {
     g_ctx->glfw.set_error_callback(prev_error_callback);
   }
@@ -196,8 +195,8 @@ std::expected<void, BootstrapError> InstallRenderHook(JavaVM* jvm) {
     return std::unexpected(BootstrapError::kSwapBuffersLookupFailed);
   }
 
-  // allocate and populate the context before the hook goes live.
-  // this ensures the state is ready if the render thread fires instantly.
+  // populate the context before the hook goes live so the render thread
+  // doesn't race against uninitialized state.
   g_ctx = std::make_unique<OverlayContext>();
   g_ctx->jvm = jvm;
   g_ctx->glfw = std::move(lookup.functions);

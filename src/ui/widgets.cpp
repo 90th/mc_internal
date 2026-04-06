@@ -8,12 +8,17 @@
 
 namespace mc_internal::ui {
 
-constexpr ImU32 kAccentColor = IM_COL32(180, 20, 20, 255);
-constexpr ImU32 kDimTextColor = IM_COL32(127, 127, 127, 255);
-constexpr ImU32 kWhiteTextColor = IM_COL32(255, 255, 255, 255);
-constexpr ImU32 kTrackColor = IM_COL32(60, 60, 60, 255);
-constexpr ImU32 kGrabShadowColor = IM_COL32(0, 0, 0, 70);
+// ── palette ──────────────────────────────────────────────────────────────────
+constexpr ImU32 kAccent = IM_COL32(200, 60, 60, 255);
+constexpr ImU32 kAccentDim = IM_COL32(200, 60, 60, 100);
+constexpr ImU32 kTextBright = IM_COL32(220, 220, 220, 255);
+constexpr ImU32 kTextMid = IM_COL32(140, 140, 140, 255);
+constexpr ImU32 kTextDim = IM_COL32(90, 90, 90, 255);
+constexpr ImU32 kTrack = IM_COL32(38, 38, 42, 255);
+constexpr ImU32 kCardBg = IM_COL32(30, 30, 34, 255);
+constexpr ImU32 kToggleOff = IM_COL32(50, 50, 55, 255);
 
+// ── Tab ──────────────────────────────────────────────────────────────────────
 bool Tab(const char* label, bool selected) {
   ImGuiWindow* window = ImGui::GetCurrentWindow();
   if (window->SkipItems) { return false; }
@@ -21,9 +26,8 @@ bool Tab(const char* label, bool selected) {
   const ImGuiID id = window->GetID(label);
   const ImVec2 label_size = ImGui::CalcTextSize(label, nullptr, true);
 
-  // keep the tab hit box slightly larger than the text.
   const ImVec2 pos = window->DC.CursorPos;
-  const ImVec2 size = ImVec2(label_size.x + 16.0f, label_size.y + 12.0f);
+  const ImVec2 size = ImVec2(label_size.x + 14.0f, label_size.y + 8.0f);
   const ImRect bb(pos, pos + size);
 
   ImGui::ItemSize(size, 0.0f);
@@ -32,28 +36,25 @@ bool Tab(const char* label, bool selected) {
   bool hovered, held;
   const bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
 
-  float t = hovered ? 1.0f : 0.0f;
-  if (selected) { t = 1.0f; }
+  ImU32 text_color = kTextMid;
+  if (selected) {
+    text_color = kAccent;
+  } else if (hovered) {
+    text_color = kTextBright;
+  }
 
-  const ImU32 text_color =
-      selected ? kAccentColor
-               : ImGui::GetColorU32(ImLerp(ImGui::ColorConvertU32ToFloat4(kDimTextColor),
-                                           ImGui::ColorConvertU32ToFloat4(kWhiteTextColor),
-                                           t));
-
-  const ImVec2 text_pos = ImVec2(pos.x + 8.0f, pos.y + 6.0f);
+  const ImVec2 text_pos = ImVec2(pos.x + 7.0f, pos.y + 4.0f);
   window->DrawList->AddText(text_pos, text_color, label);
 
   if (selected) {
-    window->DrawList->AddLine(ImVec2(pos.x + 4.0f, bb.Max.y - 2.0f),
-                              ImVec2(bb.Max.x - 4.0f, bb.Max.y - 2.0f),
-                              kAccentColor,
-                              2.0f);
+    window->DrawList->AddRectFilled(
+        ImVec2(pos.x + 4.0f, bb.Max.y - 2.0f), ImVec2(bb.Max.x - 4.0f, bb.Max.y), kAccent, 1.0f);
   }
 
   return pressed;
 }
 
+// ── SliderFloat ──────────────────────────────────────────────────────────────
 bool SliderFloat(const char* label, float* v, float v_min, float v_max, const char* format) {
   ImGuiWindow* window = ImGui::GetCurrentWindow();
   if (window->SkipItems) { return false; }
@@ -62,9 +63,13 @@ bool SliderFloat(const char* label, float* v, float v_min, float v_max, const ch
   const ImGuiStyle& style = g.Style;
   const ImGuiID id = window->GetID(label);
   const float width = ImGui::CalcItemWidth();
-  const float frame_height = ImGui::GetFrameHeight();
+
+  // thinner track for a cleaner look
+  constexpr float kTrackHeight = 6.0f;
+  constexpr float kGrabRadius = 5.0f;
+  const float total_height = kTrackHeight + kGrabRadius * 2.0f + 4.0f;
   const ImVec2 pos = window->DC.CursorPos;
-  const ImRect bb(pos, pos + ImVec2(width, frame_height));
+  const ImRect bb(pos, pos + ImVec2(width, total_height));
 
   ImGui::ItemSize(bb, style.FramePadding.y);
   if (!ImGui::ItemAdd(bb, id)) { return false; }
@@ -75,8 +80,7 @@ bool SliderFloat(const char* label, float* v, float v_min, float v_max, const ch
   bool value_changed = false;
   const float value_range = v_max - v_min;
   if (held && value_range > 0.0f) {
-    const float mouse_x = g.IO.MousePos.x;
-    const float normalized_val = ImClamp((mouse_x - bb.Min.x) / width, 0.0f, 1.0f);
+    const float normalized_val = ImClamp((g.IO.MousePos.x - bb.Min.x) / width, 0.0f, 1.0f);
     const float new_value = v_min + value_range * normalized_val;
     if (*v != new_value) {
       *v = new_value;
@@ -86,33 +90,103 @@ bool SliderFloat(const char* label, float* v, float v_min, float v_max, const ch
 
   if (value_changed) { ImGui::MarkItemEdited(id); }
 
-  const ImRect track_bb(bb.Min + ImVec2(0.0f, 2.0f), bb.Max - ImVec2(0.0f, 2.0f));
-  const float track_rounding = track_bb.GetHeight() * 0.5f;
+  // draw track centered vertically
+  const float track_y = bb.Min.y + (total_height - kTrackHeight) * 0.5f;
+  const ImRect track_bb(ImVec2(bb.Min.x, track_y), ImVec2(bb.Max.x, track_y + kTrackHeight));
+  const float track_rounding = kTrackHeight * 0.5f;
+
   const float normalized_current =
       value_range > 0.0f ? ImClamp((*v - v_min) / value_range, 0.0f, 1.0f) : 0.0f;
   const float fill_x = track_bb.Min.x + track_bb.GetWidth() * normalized_current;
-  const ImVec2 grab_center(fill_x, track_bb.GetCenter().y);
 
-  // keep the track tall enough to hold the value text inside it.
-  window->DrawList->AddRectFilled(track_bb.Min, track_bb.Max, kTrackColor, track_rounding);
-  if (fill_x > track_bb.Min.x) {
+  window->DrawList->AddRectFilled(track_bb.Min, track_bb.Max, kTrack, track_rounding);
+  if (fill_x > track_bb.Min.x + 1.0f) {
     window->DrawList->AddRectFilled(
-        track_bb.Min, ImVec2(fill_x, track_bb.Max.y), kAccentColor, track_rounding);
+        track_bb.Min, ImVec2(fill_x, track_bb.Max.y), kAccent, track_rounding);
   }
-  window->DrawList->AddCircleFilled(grab_center + ImVec2(0.0f, 1.5f), 8.5f, kGrabShadowColor);
-  window->DrawList->AddCircleFilled(grab_center, 8.0f, kWhiteTextColor);
+
+  const ImVec2 grab_center(fill_x, track_bb.GetCenter().y);
+  const ImU32 grab_color = (held || hovered) ? kTextBright : IM_COL32(200, 200, 200, 255);
+  window->DrawList->AddCircleFilled(grab_center, kGrabRadius, grab_color);
 
   char value_buf[64];
   std::snprintf(value_buf, sizeof(value_buf), format, *v);
-
   const ImVec2 value_size = ImGui::CalcTextSize(value_buf, nullptr, true);
-  const float text_padding_x = 10.0f;
-  const ImVec2 text_pos(track_bb.Max.x - text_padding_x - value_size.x,
-                        track_bb.Min.y + (track_bb.GetHeight() - value_size.y) * 0.5f);
-  window->DrawList->AddText(text_pos + ImVec2(1.0f, 1.0f), IM_COL32(0, 0, 0, 170), value_buf);
-  window->DrawList->AddText(text_pos, kWhiteTextColor, value_buf);
+  const ImVec2 text_pos(bb.Max.x - value_size.x, track_bb.Max.y + 2.0f);
+  window->DrawList->AddText(text_pos, kTextMid, value_buf);
 
   return value_changed;
+}
+
+// ── Toggle ───────────────────────────────────────────────────────────────────
+bool Toggle(const char* label, bool* v) {
+  ImGuiWindow* window = ImGui::GetCurrentWindow();
+  if (window->SkipItems) { return false; }
+
+  const ImGuiID id = window->GetID(label);
+  const ImVec2 label_size = ImGui::CalcTextSize(label, nullptr, true);
+
+  // compact rectangular toggle: 28x14
+  constexpr float kToggleW = 28.0f;
+  constexpr float kToggleH = 14.0f;
+  constexpr float kKnobSize = 10.0f;
+  constexpr float kRounding = 3.0f;
+
+  const float total_width = kToggleW + 6.0f + label_size.x;
+  const float total_height = ImMax(kToggleH, label_size.y);
+  const ImVec2 pos = window->DC.CursorPos;
+  const ImRect bb(pos, pos + ImVec2(total_width, total_height));
+
+  ImGui::ItemSize(bb, 0.0f);
+  if (!ImGui::ItemAdd(bb, id)) { return false; }
+
+  bool hovered, held;
+  const bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
+  if (pressed) { *v = !*v; }
+
+  const float track_y = pos.y + (total_height - kToggleH) * 0.5f;
+  const ImVec2 track_min(pos.x, track_y);
+  const ImVec2 track_max(pos.x + kToggleW, track_y + kToggleH);
+  const ImU32 track_color = *v ? kAccent : kToggleOff;
+  window->DrawList->AddRectFilled(track_min, track_max, track_color, kRounding);
+
+  const float knob_pad = (kToggleH - kKnobSize) * 0.5f;
+  const float knob_x = *v ? (track_max.x - kKnobSize - knob_pad) : (track_min.x + knob_pad);
+  const float knob_y = track_y + knob_pad;
+  window->DrawList->AddRectFilled(
+      ImVec2(knob_x, knob_y), ImVec2(knob_x + kKnobSize, knob_y + kKnobSize), kTextBright, 2.0f);
+
+  const ImVec2 text_pos(pos.x + kToggleW + 6.0f, pos.y + (total_height - label_size.y) * 0.5f);
+  window->DrawList->AddText(text_pos, kTextBright, label);
+
+  return pressed;
+}
+
+// ── SectionHeader ────────────────────────────────────────────────────────────
+void SectionHeader(const char* label) {
+  ImGuiWindow* window = ImGui::GetCurrentWindow();
+  if (window->SkipItems) { return; }
+
+  ImGui::Spacing();
+
+  const ImVec2 pos = window->DC.CursorPos;
+  const ImVec2 label_size = ImGui::CalcTextSize(label, nullptr, true);
+  const float avail_width = ImGui::GetContentRegionAvail().x;
+
+  window->DrawList->AddText(pos, kTextDim, label);
+
+  const float line_y = pos.y + label_size.y + 3.0f;
+  window->DrawList->AddLine(
+      ImVec2(pos.x, line_y), ImVec2(pos.x + avail_width, line_y), IM_COL32(50, 50, 55, 255), 1.0f);
+
+  ImGui::Dummy(ImVec2(0.0f, label_size.y + 8.0f));
+}
+
+// ── DescriptionText ──────────────────────────────────────────────────────────
+void DescriptionText(const char* text) {
+  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+  ImGui::TextWrapped("%s", text);
+  ImGui::PopStyleColor();
 }
 
 }  // namespace mc_internal::ui

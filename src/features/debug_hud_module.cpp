@@ -10,50 +10,72 @@
 
 namespace mc_internal {
 
+namespace {
+
+constexpr ImU32 kHudBg = IM_COL32(18, 19, 24, 200);
+constexpr ImU32 kHudBorder = IM_COL32(40, 41, 48, 255);
+constexpr ImU32 kHudText = IM_COL32(180, 180, 180, 255);
+constexpr ImU32 kHudLabel = IM_COL32(110, 110, 110, 255);
+constexpr ImU32 kHudAccent = IM_COL32(200, 60, 60, 255);
+constexpr float kHudRounding = 4.0f;
+constexpr float kHudPadX = 10.0f;
+constexpr float kHudPadY = 6.0f;
+constexpr float kHudMargin = 12.0f;
+
+}  // namespace
+
 DebugHudModule::DebugHudModule()
     : Module("debug hud", "displays the local player coordinates", ModuleCategory::kMisc) {}
 
 void DebugHudModule::on_render_ui(const OverlayContext& ctx) {
-  ImGui::SetNextWindowPos(ImVec2(320.0f, 40.0f), ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2(240.0f, 0.0f), ImGuiCond_FirstUseEver);
-
-  ImGui::Begin("debug hud");
+  const char* status_text = nullptr;
+  char coord_buf[128] = {};
 
   if (!ctx.jvm_attachment) {
-    ImGui::TextUnformatted("player: jni unavailable");
-    ImGui::End();
-    return;
+    status_text = "jni unavailable";
+  } else {
+    const JniEnv env(ctx.jvm_attachment->env());
+    if (!ctx.jni_cache.Initialize(env)) {
+      status_text = "jni cache unavailable";
+    } else {
+      auto mc = Minecraft::GetInstance(env, ctx.jni_cache);
+      if (!mc) {
+        status_text = "not in game";
+      } else {
+        auto player = Minecraft::GetLocalPlayer(env, ctx.jni_cache, mc.get());
+        if (!player) {
+          status_text = "not in game";
+        } else {
+          const auto [x, y, z] =
+              ClientPlayerEntity::GetCoordinates(env, ctx.jni_cache, player.get());
+          std::snprintf(coord_buf, sizeof(coord_buf), "%.1f  %.1f  %.1f", x, y, z);
+        }
+      }
+    }
   }
 
-  const JniEnv env(ctx.jvm_attachment->env());
-  if (!ctx.jni_cache.Initialize(env)) {
-    ImGui::TextUnformatted("player: jni cache unavailable");
-    ImGui::End();
-    return;
-  }
+  const char* line1 = "pos";
+  const char* line2 = (coord_buf[0] != '\0') ? coord_buf : status_text;
 
-  auto minecraft_instance = Minecraft::GetInstance(env, ctx.jni_cache);
-  if (!minecraft_instance) {
-    ImGui::TextUnformatted("player: not in game");
-    ImGui::End();
-    return;
-  }
+  ImDrawList* dl = ImGui::GetForegroundDrawList();
+  const ImVec2 line1_size = ImGui::CalcTextSize(line1);
+  const ImVec2 line2_size = ImGui::CalcTextSize(line2);
+  const float line_spacing = 2.0f;
 
-  auto player = Minecraft::GetLocalPlayer(env, ctx.jni_cache, minecraft_instance.get());
-  if (!player) {
-    ImGui::TextUnformatted("player: not in game");
-    ImGui::End();
-    return;
-  }
+  const float box_w = kHudPadX * 2.0f + std::max(line1_size.x, line2_size.x);
+  const float box_h = kHudPadY * 2.0f + line1_size.y + line_spacing + line2_size.y;
 
-  const auto [x, y, z] = ClientPlayerEntity::GetCoordinates(env, ctx.jni_cache, player.get());
+  const ImVec2 box_min(kHudMargin, kHudMargin);
+  const ImVec2 box_max(box_min.x + box_w, box_min.y + box_h);
 
-  // Format the string locally to bypass ImGui varargs corruption
-  char buffer[128];
-  std::snprintf(buffer, sizeof(buffer), "pos: %.2f, %.2f, %.2f", x, y, z);
-  ImGui::TextUnformatted(buffer);
+  dl->AddRectFilled(box_min, box_max, kHudBg, kHudRounding);
+  dl->AddRect(box_min, box_max, kHudBorder, kHudRounding, 0, 1.0f);
 
-  ImGui::End();
+  dl->AddText(ImVec2(box_min.x + kHudPadX, box_min.y + kHudPadY), kHudLabel, line1);
+
+  dl->AddText(ImVec2(box_min.x + kHudPadX, box_min.y + kHudPadY + line1_size.y + line_spacing),
+              (coord_buf[0] != '\0') ? kHudText : kHudAccent,
+              line2);
 }
 
 }  // namespace mc_internal

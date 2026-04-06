@@ -63,7 +63,6 @@ void ProcessInput(GLFWwindow* window, OverlayContext& ctx) {
     io.AddMouseButtonEvent(1, glfw.get_mouse_button(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
   }
 
-  // Restore GLFW error callback.
   if (glfw.set_error_callback && prev_error_callback) {
     glfw.set_error_callback(prev_error_callback);
   }

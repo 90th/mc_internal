@@ -111,6 +111,11 @@ target_include_directories(mc_internal
         ${CMAKE_CURRENT_SOURCE_DIR}/deps/libmem/include
 )
 
+# Bake the font path so imgui_manager can load Roboto at runtime.
+target_compile_definitions(mc_internal PRIVATE
+    MCINTERNAL_FONT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/deps/imgui/misc/fonts/Roboto-Medium.ttf"
+)
+
 target_link_libraries(mc_internal
     PRIVATE
         mc_internal_jnihook
