@@ -19,8 +19,7 @@ struct LookupCallbackData {
 };
 
 [[nodiscard]] bool IsGlfwLibraryPath(std::string_view path) {
-  return path.find("libglfw.so") != std::string_view::npos ||
-         path.find("libglfw_wayland.so") != std::string_view::npos;
+  return path.contains("libglfw.so") || path.contains("libglfw_wayland.so");
 }
 
 [[nodiscard]] bool IsSystemGlfwPath(std::string_view path) {
@@ -29,14 +28,14 @@ struct LookupCallbackData {
 }
 
 [[nodiscard]] int ScoreGlfwLibraryPath(std::string_view path) {
-  if (path.find("liblwjgl_glfw") != std::string_view::npos) { return -1; }
+  if (path.contains("liblwjgl_glfw")) { return -1; }
   if (!IsGlfwLibraryPath(path)) { return -1; }
   if (IsSystemGlfwPath(path)) { return -1; }
 
   int score = 0;
-  if (path.find("natives") != std::string_view::npos) { score += 100; }
-  if (path.find("PrismLauncher") != std::string_view::npos) { score += 50; }
-  if (path.find("instances") != std::string_view::npos) { score += 25; }
+  if (path.contains("natives")) { score += 100; }
+  if (path.contains("PrismLauncher")) { score += 50; }
+  if (path.contains("instances")) { score += 25; }
   if (!path.empty() && path[0] == '/') { score += 10; }
   return score;
 }
@@ -45,7 +44,7 @@ struct LookupCallbackData {
   return functions.get_framebuffer_size != nullptr && functions.get_window_size != nullptr &&
          functions.get_key != nullptr && functions.get_mouse_button != nullptr &&
          functions.get_cursor_pos != nullptr && functions.set_input_mode != nullptr &&
-         functions.get_input_mode != nullptr && functions.get_current_context != nullptr;
+         functions.set_cursor_pos != nullptr && functions.get_input_mode != nullptr;
 }
 
 int LocateLwjglGlfwCallback(struct dl_phdr_info* info, size_t, void* data) {
@@ -65,15 +64,32 @@ int LocateLwjglGlfwCallback(struct dl_phdr_info* info, size_t, void* data) {
   functions.get_mouse_button = (GlfwGetMouseButtonFn)dlsym(handle, "glfwGetMouseButton");
   functions.get_cursor_pos = (GlfwGetCursorPosFn)dlsym(handle, "glfwGetCursorPos");
   functions.set_input_mode = (GlfwSetInputModeFn)dlsym(handle, "glfwSetInputMode");
+  functions.set_cursor_pos = (GlfwSetCursorPosFn)dlsym(handle, "glfwSetCursorPos");
   functions.get_input_mode = (GlfwGetInputModeFn)dlsym(handle, "glfwGetInputMode");
-  functions.get_current_context = (GlfwGetCurrentContextFn)dlsym(handle, "glfwGetCurrentContext");
+  functions.get_time = (GlfwGetTimeFn)dlsym(handle, "glfwGetTime");
+  functions.set_error_callback = (GlfwSetErrorCallbackFn)dlsym(handle, "glfwSetErrorCallback");
+
+  functions.set_cursor_pos_callback =
+      (GlfwSetCursorPosCallbackFn)dlsym(handle, "glfwSetCursorPosCallback");
+  functions.set_key_callback = (GlfwSetKeyCallbackFn)dlsym(handle, "glfwSetKeyCallback");
+  functions.set_mouse_button_callback =
+      (GlfwSetMouseButtonCallbackFn)dlsym(handle, "glfwSetMouseButtonCallback");
+  functions.set_char_callback = (GlfwSetCharCallbackFn)dlsym(handle, "glfwSetCharCallback");
+  functions.set_scroll_callback = (GlfwSetScrollCallbackFn)dlsym(handle, "glfwSetScrollCallback");
 
   void* swap_addr = dlsym(handle, "glfwSwapBuffers");
-  if (!swap_addr || !HasRequiredFunctions(functions)) { return 0; }
+  if (!swap_addr || !HasRequiredFunctions(functions)) {
+    dlclose(handle);
+    return 0;
+  }
 
   auto* result = static_cast<LookupCallbackData*>(data);
-  if (score <= result->best_score) { return 0; }
+  if (score <= result->best_score) {
+    dlclose(handle);
+    return 0;
+  }
 
+  dlclose(handle);
   result->best_score = score;
   result->swap_buffers_address = swap_addr;
   result->functions = functions;

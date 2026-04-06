@@ -1,5 +1,6 @@
 #include "mc_internal/features/esp_module.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -9,12 +10,18 @@
 #include "mc_internal/core/jvm_attachment.hpp"
 #include "mc_internal/sdk/math.hpp"
 #include "mc_internal/sdk/minecraft.hpp"
+#include "mc_internal/ui/widgets.hpp"
 
 namespace mc_internal {
 
 namespace {
 
 constexpr float kPi = 3.14159265358979323846f;
+constexpr float kMinRenderDistance = 16.0f;
+constexpr float kMaxRenderDistance = 512.0f;
+constexpr ImGuiColorEditFlags kGroupColorEditFlags =
+    ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_AlphaPreview |
+    ImGuiColorEditFlags_NoTooltip;
 
 float ToRadians(float degrees) { return degrees * (kPi / 180.0f); }
 
@@ -61,11 +68,9 @@ void BuildViewMatrix(const Vec3& camera_position,
 
   Vec3 right;
   if (std::abs(pitch_degrees) > 89.0f) {
-    // Prevent Gimbal Lock when looking straight up or down
     right = {-std::cos(yaw), 0.0, -std::sin(yaw)};
   } else {
     const Vec3 world_up = {0.0, 1.0, 0.0};
-    // FIX: Cross product order swapped to fix the inverted X-axis
     right = Normalize(Cross(forward, world_up));
   }
 
@@ -88,17 +93,68 @@ void BuildViewMatrix(const Vec3& camera_position,
   matrix[14] = static_cast<float>(Dot(forward, camera_position));
 }
 
+ImU32 ToImColor(const std::array<float, 4>& color) {
+  return ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], color[3]));
+}
+
+void RenderTargetGroupRow(const char* label,
+                          const char* color_id,
+                          bool* enabled,
+                          std::array<float, 4>* color) {
+  const float color_button_size = ImGui::GetFrameHeight();
+
+  ImGui::Checkbox(label, enabled);
+
+  ImGui::SameLine();
+  const float current_x = ImGui::GetCursorPosX();
+  const float color_x = current_x + ImGui::GetContentRegionAvail().x - color_button_size;
+  ImGui::SetCursorPosX(std::max(current_x, color_x));
+  ImGui::ColorEdit4(color_id, color->data(), kGroupColorEditFlags);
+}
+
 }  // namespace
 
-EspModule::EspModule() : Module("ESP", "Draws projected 2D boxes around world entities") {}
+EspModule::EspModule()
+    : Module("entity esp",
+             "draws projected 2d boxes around world entities",
+             ModuleCategory::kVisuals) {}
+
+void EspModule::on_render_settings(const OverlayContext& ctx) {
+  static_cast<void>(ctx);
+
+  ui::SectionHeader("target groups");
+
+  RenderTargetGroupRow(
+      "players", "##esp_players_color", &player_group_.enabled, &player_group_.color);
+  RenderTargetGroupRow(
+      "hostiles", "##esp_hostiles_color", &hostile_group_.enabled, &hostile_group_.color);
+  RenderTargetGroupRow(
+      "passives", "##esp_passives_color", &passive_group_.enabled, &passive_group_.color);
+  RenderTargetGroupRow("items", "##esp_items_color", &item_group_.enabled, &item_group_.color);
+
+  ui::SectionHeader("render distance");
+
+  ImGui::PushItemWidth(-1.0f);
+  ui::SliderFloat("##esp_max_render_distance",
+                  &max_render_distance_,
+                  kMinRenderDistance,
+                  kMaxRenderDistance,
+                  "%.0f blocks");
+  ImGui::PopItemWidth();
+
+  ImGui::Spacing();
+}
 
 void EspModule::on_render_3d(const OverlayContext& ctx) {
+  if (!player_group_.enabled && !hostile_group_.enabled && !passive_group_.enabled &&
+      !item_group_.enabled) {
+    return;
+  }
   if (ctx.display_width <= 0 || ctx.display_height <= 0) { return; }
 
-  const auto attachment = AttachCurrentThread(ctx.jvm);
-  if (!attachment) { return; }
+  if (!ctx.jvm_attachment) { return; }
 
-  const JniEnv env(attachment->env());
+  const JniEnv env(ctx.jvm_attachment->env());
   if (!ctx.jni_cache.Initialize(env)) { return; }
 
   auto minecraft_instance = Minecraft::GetInstance(env, ctx.jni_cache);
@@ -132,23 +188,52 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
                          1000.0f,
                          projection_matrix.data());
 
+  const double max_render_distance_sq =
+      static_cast<double>(max_render_distance_) * static_cast<double>(max_render_distance_);
   ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
+
   for (auto entity : ClientWorld::GetEntities(env, ctx.jni_cache, world.get())) {
     if (!entity) { continue; }
     if (local_player && env->IsSameObject(entity.get(), local_player.get()) == JNI_TRUE) {
       continue;
     }
 
+    // extract coordinates first for early distance culling (3 jni calls).
+    // avoids 6+ jni calls per entity when distance check fails.
+    auto [entity_x, entity_y, entity_z] = Entity::GetCoordinates(env, ctx.jni_cache, entity.get());
+
+    const double dx = entity_x - camera_position.x;
+    const double dy = entity_y - camera_position.y;
+    const double dz = entity_z - camera_position.z;
+    const double distance_sq = dx * dx + dy * dy + dz * dz;
+    if (distance_sq > max_render_distance_sq) { continue; }
+
+    const std::array<float, 4>* box_color = nullptr;
+    if (player_group_.enabled &&
+        env->IsInstanceOf(entity.get(), ctx.jni_cache.client_player_entity_class)) {
+      box_color = &player_group_.color;
+    } else if (hostile_group_.enabled &&
+               env->IsInstanceOf(entity.get(), ctx.jni_cache.hostile_entity_class)) {
+      box_color = &hostile_group_.color;
+    } else if (passive_group_.enabled &&
+               env->IsInstanceOf(entity.get(), ctx.jni_cache.passive_entity_class)) {
+      box_color = &passive_group_.color;
+    } else if (item_group_.enabled &&
+               env->IsInstanceOf(entity.get(), ctx.jni_cache.item_entity_class)) {
+      box_color = &item_group_.color;
+    }
+    if (box_color == nullptr) { continue; }
+
     const EntityData entity_data = Entity::GetData(env, ctx.jni_cache, entity.get());
     if (!entity_data.is_alive) { continue; }
 
-    const double entity_x = Lerp(entity_data.prev_x, entity_data.x, tick_delta);
-    const double entity_y = Lerp(entity_data.prev_y, entity_data.y, tick_delta);
-    const double entity_z = Lerp(entity_data.prev_z, entity_data.z, tick_delta);
+    const double lerped_x = Lerp(entity_data.prev_x, entity_x, tick_delta);
+    const double lerped_y = Lerp(entity_data.prev_y, entity_y, tick_delta);
+    const double lerped_z = Lerp(entity_data.prev_z, entity_z, tick_delta);
 
-    const Vec3 feet = {entity_x, entity_y, entity_z};
+    const Vec3 feet = {lerped_x, lerped_y, lerped_z};
     const Vec3 head = {
-        entity_x, entity_y + static_cast<double>(entity_data.height) + 0.2, entity_z};
+        lerped_x, lerped_y + static_cast<double>(entity_data.height) + 0.2, lerped_z};
 
     Vec2 feet_screen = {};
     Vec2 head_screen = {};
@@ -175,7 +260,7 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
     const float half_width = height * 0.25f;
     draw_list->AddRect(ImVec2(head_screen.x - half_width, top),
                        ImVec2(head_screen.x + half_width, bottom),
-                       IM_COL32(220, 40, 40, 255),
+                       ToImColor(*box_color),
                        0.0f,
                        0,
                        1.5f);

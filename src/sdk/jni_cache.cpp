@@ -47,12 +47,16 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
   joml_matrix4f_class = CacheGlobalClass(env, kJomlMatrix4fClass);
   java_lang_iterable_class = CacheGlobalClass(env, kJavaLangIterableClass);
   java_util_iterator_class = CacheGlobalClass(env, kJavaUtilIteratorClass);
+  hostile_entity_class = CacheGlobalClass(env, kHostileEntityClass);
+  passive_entity_class = CacheGlobalClass(env, kPassiveEntityClass);
+  item_entity_class = CacheGlobalClass(env, kItemEntityClass);
 
   if (minecraft_client_class == nullptr || client_player_entity_class == nullptr ||
       client_world_class == nullptr || entity_class == nullptr || game_renderer_class == nullptr ||
       camera_class == nullptr || vec3d_class == nullptr || render_tick_counter_class == nullptr ||
       joml_matrix4f_class == nullptr || java_lang_iterable_class == nullptr ||
-      java_util_iterator_class == nullptr) {
+      java_util_iterator_class == nullptr || hostile_entity_class == nullptr ||
+      passive_entity_class == nullptr || item_entity_class == nullptr) {
     Reset(env.get());
     PrintStatus("jni cache initialization failed: missing class handles");
     return false;
@@ -178,6 +182,13 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   if (env != nullptr && java_util_iterator_class != nullptr) {
     env->DeleteGlobalRef(java_util_iterator_class);
   }
+  if (env != nullptr && hostile_entity_class != nullptr) {
+    env->DeleteGlobalRef(hostile_entity_class);
+  }
+  if (env != nullptr && passive_entity_class != nullptr) {
+    env->DeleteGlobalRef(passive_entity_class);
+  }
+  if (env != nullptr && item_entity_class != nullptr) { env->DeleteGlobalRef(item_entity_class); }
 
   minecraft_client_class = nullptr;
   client_player_entity_class = nullptr;
@@ -190,6 +201,9 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   joml_matrix4f_class = nullptr;
   java_lang_iterable_class = nullptr;
   java_util_iterator_class = nullptr;
+  hostile_entity_class = nullptr;
+  passive_entity_class = nullptr;
+  item_entity_class = nullptr;
 
   minecraft_client_get_instance = nullptr;
   minecraft_client_player_field = nullptr;

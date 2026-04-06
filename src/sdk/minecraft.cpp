@@ -373,9 +373,24 @@ float Camera::GetYaw(const JniEnv& env, const JniCache& cache, jobject camera_in
                          kCameraGetYawSignature);
 }
 
+std::tuple<double, double, double>
+Entity::GetCoordinates(const JniEnv& env, const JniCache& cache, jobject entity) {
+  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_get_x == nullptr ||
+      cache.entity_get_y == nullptr || cache.entity_get_z == nullptr) {
+    return {0.0, 0.0, 0.0};
+  }
+
+  return {CallEntityCoordinateMethod(env, entity, cache.entity_get_x, kEntityGetXMethod),
+          CallEntityCoordinateMethod(env, entity, cache.entity_get_y, kEntityGetYMethod),
+          CallEntityCoordinateMethod(env, entity, cache.entity_get_z, kEntityGetZMethod)};
+}
+
 EntityData Entity::GetData(const JniEnv& env, const JniCache& cache, jobject entity) {
   EntityData data{};
   if (!env || !cache.is_initialized() || entity == nullptr) { return data; }
+
+  // note: coordinate fetching is done separately via GetCoordinates() for performance.
+  // this method only fetches the heavy data (is_alive, prev positions, height).
 
   data.is_alive = CallBooleanMethod(env,
                                     entity,
@@ -383,12 +398,6 @@ EntityData Entity::GetData(const JniEnv& env, const JniCache& cache, jobject ent
                                     kEntityClass,
                                     kEntityIsAliveMethod,
                                     kEntityIsAliveSignature);
-  data.x = CallEntityCoordinateMethod(env, entity, cache.entity_get_x, kEntityGetXMethod);
-  data.y = CallEntityCoordinateMethod(env, entity, cache.entity_get_y, kEntityGetYMethod);
-  data.z = CallEntityCoordinateMethod(env, entity, cache.entity_get_z, kEntityGetZMethod);
-  data.prev_x = data.x;
-  data.prev_y = data.y;
-  data.prev_z = data.z;
 
   auto last_render_pos = CallObjectMethodReference(env,
                                                    entity,

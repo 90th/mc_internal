@@ -83,6 +83,7 @@ target_sources(mc_internal PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/logging.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hook/glfw_bindings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/hook/input_suppression.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hook/render_hook.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/jvm_attachment.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/jni_hook.cpp
@@ -96,6 +97,7 @@ target_sources(mc_internal PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/opengl_state.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/imgui_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/input_handler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/widgets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/menu.cpp
 )
 
@@ -108,6 +110,11 @@ target_include_directories(mc_internal
         ${CMAKE_CURRENT_SOURCE_DIR}/deps/imgui/backends
         ${CMAKE_CURRENT_SOURCE_DIR}/deps/imgui/examples/libs/glfw/include
         ${CMAKE_CURRENT_SOURCE_DIR}/deps/libmem/include
+)
+
+# Bake the font path so imgui_manager can load Roboto at runtime.
+target_compile_definitions(mc_internal PRIVATE
+    MCINTERNAL_FONT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/deps/imgui/misc/fonts/Roboto-Medium.ttf"
 )
 
 target_link_libraries(mc_internal

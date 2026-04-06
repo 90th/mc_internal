@@ -1,21 +1,32 @@
 #pragma once
 
-#include <string_view>
-
 namespace mc_internal {
 
 struct OverlayContext;
 
+enum class ModuleCategory {
+  kCombat,
+  kVisuals,
+  kMovement,
+  kMisc,
+};
+
 class Module {
  public:
-  Module(std::string_view name, std::string_view description)
-      : name_(name), description_(description) {}
+  Module(const char* name, const char* description, ModuleCategory category)
+      : category_(category), name_(name), description_(description) {}
+
   virtual ~Module() = default;
 
   virtual void on_enable() {}
   virtual void on_disable() {}
 
+  // this stays reserved for floating overlays like the debug hud.
   virtual void on_render_ui(const OverlayContext& ctx) { static_cast<void>(ctx); }
+
+  // this stays reserved for widgets rendered inside the master menu.
+  virtual void on_render_settings(const OverlayContext& ctx) { static_cast<void>(ctx); }
+
   virtual void on_render_3d(const OverlayContext& ctx) { static_cast<void>(ctx); }
 
   void toggle() {
@@ -28,12 +39,15 @@ class Module {
   }
 
   [[nodiscard]] bool is_enabled() const noexcept { return enabled_; }
-  [[nodiscard]] std::string_view get_name() const noexcept { return name_; }
+  [[nodiscard]] ModuleCategory get_category() const noexcept { return category_; }
+  [[nodiscard]] const char* get_name() const noexcept { return name_; }
+  [[nodiscard]] const char* get_description() const noexcept { return description_; }
 
  protected:
   bool enabled_ = false;
-  std::string_view name_;
-  std::string_view description_;
+  ModuleCategory category_ = ModuleCategory::kMisc;
+  const char* name_ = nullptr;
+  const char* description_ = nullptr;
 };
 
 }  // namespace mc_internal

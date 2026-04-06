@@ -16,21 +16,29 @@ OpenGlBootstrapState PrepareOpenGlStateForImGuiBootstrap() {
   glGetIntegerv(GL_TEXTURE_BINDING_2D, &state.texture_binding_2d);
   glGetIntegerv(GL_SAMPLER_BINDING, &state.sampler_binding);
   glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &state.pixel_unpack_buffer_binding);
+
   glGetIntegerv(GL_UNPACK_ROW_LENGTH, &state.unpack_row_length);
   glGetIntegerv(GL_UNPACK_SKIP_ROWS, &state.unpack_skip_rows);
   glGetIntegerv(GL_UNPACK_SKIP_PIXELS, &state.unpack_skip_pixels);
   glGetIntegerv(GL_UNPACK_ALIGNMENT, &state.unpack_alignment);
   glGetIntegerv(GL_UNPACK_SKIP_IMAGES, &state.unpack_skip_images);
+  glGetIntegerv(GL_UNPACK_IMAGE_HEIGHT, &state.unpack_image_height);
+  glGetIntegerv(GL_UNPACK_SWAP_BYTES, &state.unpack_swap_bytes);
+  glGetIntegerv(GL_UNPACK_LSB_FIRST, &state.unpack_lsb_first);
 
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindSampler(0, 0);
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
   glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
   glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
   glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   glPixelStorei(GL_UNPACK_SKIP_IMAGES, 0);
+  glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, 0);
+  glPixelStorei(GL_UNPACK_SWAP_BYTES, 0);
+  glPixelStorei(GL_UNPACK_LSB_FIRST, 0);
 
   return state;
 }
@@ -40,11 +48,16 @@ void RestoreOpenGlStateAfterImGuiBootstrap(const OpenGlBootstrapState& state) {
   glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(state.texture_binding_2d));
   glBindSampler(0, static_cast<GLuint>(state.sampler_binding));
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, static_cast<GLuint>(state.pixel_unpack_buffer_binding));
+
   glPixelStorei(GL_UNPACK_ROW_LENGTH, state.unpack_row_length);
   glPixelStorei(GL_UNPACK_SKIP_ROWS, state.unpack_skip_rows);
   glPixelStorei(GL_UNPACK_SKIP_PIXELS, state.unpack_skip_pixels);
   glPixelStorei(GL_UNPACK_ALIGNMENT, state.unpack_alignment);
   glPixelStorei(GL_UNPACK_SKIP_IMAGES, state.unpack_skip_images);
+  glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, state.unpack_image_height);
+  glPixelStorei(GL_UNPACK_SWAP_BYTES, state.unpack_swap_bytes);
+  glPixelStorei(GL_UNPACK_LSB_FIRST, state.unpack_lsb_first);
+
   glActiveTexture(state.active_texture);
 }
 

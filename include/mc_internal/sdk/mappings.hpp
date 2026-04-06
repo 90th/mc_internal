@@ -12,6 +12,9 @@ inline constexpr std::string_view kGameRendererClass = "net/minecraft/class_757"
 inline constexpr std::string_view kCameraClass = "net/minecraft/class_4184";
 inline constexpr std::string_view kVec3dClass = "net/minecraft/class_243";
 inline constexpr std::string_view kJomlMatrix4fClass = "org/joml/Matrix4f";
+inline constexpr std::string_view kHostileEntityClass = "net/minecraft/class_1588";
+inline constexpr std::string_view kPassiveEntityClass = "net/minecraft/class_1296";
+inline constexpr std::string_view kItemEntityClass = "net/minecraft/class_1542";
 
 inline constexpr std::string_view kJavaLangIterableClass = "java/lang/Iterable";
 inline constexpr std::string_view kJavaUtilIteratorClass = "java/util/Iterator";
