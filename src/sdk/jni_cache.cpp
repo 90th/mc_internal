@@ -134,6 +134,19 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
       entity_class, kEntityGetLastRenderPosMethod, kEntityGetLastRenderPosSignature, kEntityClass);
   entity_get_height = env.GetMethodID(
       entity_class, kEntityGetHeightMethod, kEntityGetHeightSignature, kEntityClass);
+  entity_get_type =
+      env.GetMethodID(entity_class, kEntityGetTypeMethod, kEntityGetTypeSignature, kEntityClass);
+
+  {
+    auto entity_type_class = CacheGlobalClass(env, kEntityTypeClass);
+    if (entity_type_class != nullptr) {
+      entity_type_translation_key_field = env.GetFieldID(entity_type_class,
+                                                         kEntityTypeTranslationKeyField,
+                                                         kEntityTypeTranslationKeyFieldSignature,
+                                                         kEntityTypeClass);
+      env->DeleteGlobalRef(entity_type_class);
+    }
+  }
 
   if (minecraft_client_get_instance == nullptr || minecraft_client_player_field == nullptr ||
       minecraft_client_world_field == nullptr || minecraft_client_game_renderer_field == nullptr ||
@@ -145,7 +158,7 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
       render_tick_counter_get_tick_progress == nullptr || vec3d_x_field == nullptr ||
       vec3d_y_field == nullptr || vec3d_z_field == nullptr || entity_get_x == nullptr ||
       entity_get_y == nullptr || entity_get_z == nullptr || iterable_iterator == nullptr ||
-      iterator_has_next == nullptr || iterator_next == nullptr) {
+      iterator_has_next == nullptr || iterator_next == nullptr || entity_get_type == nullptr) {
     Reset(env.get());
     PrintStatus("jni cache initialization failed: missing member handles");
     return false;
@@ -217,6 +230,8 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   entity_is_alive = nullptr;
   entity_get_last_render_pos = nullptr;
   entity_get_height = nullptr;
+  entity_get_type = nullptr;
+  entity_type_translation_key_field = nullptr;
   game_renderer_get_camera = nullptr;
   game_renderer_get_fov = nullptr;
   camera_get_pitch = nullptr;

@@ -45,6 +45,8 @@ struct JniCache {
   jmethodID entity_is_alive = nullptr;
   jmethodID entity_get_last_render_pos = nullptr;
   jmethodID entity_get_height = nullptr;
+  jmethodID entity_get_type = nullptr;
+  jfieldID entity_type_translation_key_field = nullptr;
   jmethodID game_renderer_get_camera = nullptr;
   jmethodID game_renderer_get_fov = nullptr;
   jmethodID camera_get_pitch = nullptr;

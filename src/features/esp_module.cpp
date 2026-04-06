@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
+#include <string>
+#include <unordered_set>
 
 #include "imgui.h"
 
@@ -22,6 +25,52 @@ constexpr float kMaxRenderDistance = 512.0f;
 constexpr ImGuiColorEditFlags kGroupColorEditFlags =
     ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_AlphaPreview |
     ImGuiColorEditFlags_NoTooltip;
+
+struct HostileMobEntry {
+  const char* translation_key;
+  const char* display_label;
+};
+
+constexpr HostileMobEntry kHostileMobs[] = {
+    {"entity.minecraft.blaze", "blaze"},
+    {"entity.minecraft.bogged", "bogged"},
+    {"entity.minecraft.breeze", "breeze"},
+    {"entity.minecraft.cave_spider", "cave spider"},
+    {"entity.minecraft.creaking", "creaking"},
+    {"entity.minecraft.creeper", "creeper"},
+    {"entity.minecraft.drowned", "drowned"},
+    {"entity.minecraft.elder_guardian", "elder guardian"},
+    {"entity.minecraft.ender_dragon", "ender dragon"},
+    {"entity.minecraft.enderman", "enderman"},
+    {"entity.minecraft.endermite", "endermite"},
+    {"entity.minecraft.evoker", "evoker"},
+    {"entity.minecraft.ghast", "ghast"},
+    {"entity.minecraft.guardian", "guardian"},
+    {"entity.minecraft.hoglin", "hoglin"},
+    {"entity.minecraft.husk", "husk"},
+    {"entity.minecraft.magma_cube", "magma cube"},
+    {"entity.minecraft.phantom", "phantom"},
+    {"entity.minecraft.piglin_brute", "piglin brute"},
+    {"entity.minecraft.pillager", "pillager"},
+    {"entity.minecraft.ravager", "ravager"},
+    {"entity.minecraft.shulker", "shulker"},
+    {"entity.minecraft.silverfish", "silverfish"},
+    {"entity.minecraft.skeleton", "skeleton"},
+    {"entity.minecraft.slime", "slime"},
+    {"entity.minecraft.spider", "spider"},
+    {"entity.minecraft.stray", "stray"},
+    {"entity.minecraft.vex", "vex"},
+    {"entity.minecraft.vindicator", "vindicator"},
+    {"entity.minecraft.warden", "warden"},
+    {"entity.minecraft.witch", "witch"},
+    {"entity.minecraft.wither", "wither"},
+    {"entity.minecraft.wither_skeleton", "wither skeleton"},
+    {"entity.minecraft.zoglin", "zoglin"},
+    {"entity.minecraft.zombie", "zombie"},
+    {"entity.minecraft.zombie_villager", "zombie villager"},
+    {"entity.minecraft.zombified_piglin", "zombified piglin"},
+};
+static_assert(std::size(kHostileMobs) == kHostileMobCount);
 
 float ToRadians(float degrees) { return degrees * (kPi / 180.0f); }
 
@@ -117,7 +166,24 @@ void RenderTargetGroupRow(const char* label,
 EspModule::EspModule()
     : Module("entity esp",
              "draws projected 2d boxes around world entities",
-             ModuleCategory::kVisuals) {}
+             ModuleCategory::kVisuals) {
+  hostile_mob_visible_.fill(true);
+}
+
+void EspModule::RebuildHostileFilter() {
+  hidden_hostile_keys_.clear();
+  for (int i = 0; i < kHostileMobCount; ++i) {
+    if (!hostile_mob_visible_[i]) { hidden_hostile_keys_.insert(kHostileMobs[i].translation_key); }
+  }
+  hostile_filter_dirty_ = false;
+}
+
+bool EspModule::AllHostilesVisible() const {
+  for (bool v : hostile_mob_visible_) {
+    if (!v) return false;
+  }
+  return true;
+}
 
 void EspModule::on_render_settings(const OverlayContext& ctx) {
   static_cast<void>(ctx);
@@ -128,6 +194,48 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
       "players", "##esp_players_color", &player_group_.enabled, &player_group_.color);
   RenderTargetGroupRow(
       "hostiles", "##esp_hostiles_color", &hostile_group_.enabled, &hostile_group_.color);
+  if (hostile_group_.enabled) {
+    ImGui::Indent(16.0f);
+
+    int hidden_count = 0;
+    for (bool v : hostile_mob_visible_) {
+      if (!v) ++hidden_count;
+    }
+
+    const char* preview;
+    char preview_buf[32];
+    if (hidden_count == 0) {
+      preview = "all";
+    } else if (hidden_count == kHostileMobCount) {
+      preview = "none";
+    } else {
+      std::snprintf(preview_buf, sizeof(preview_buf), "%d hidden", hidden_count);
+      preview = preview_buf;
+    }
+
+    ImGui::PushItemWidth(80.0f);
+    if (ImGui::BeginCombo("##esp_hostile_filter", preview)) {
+      for (int i = 0; i < kHostileMobCount; ++i) {
+        if (ImGui::Checkbox(kHostileMobs[i].display_label, &hostile_mob_visible_[i])) {
+          hostile_filter_dirty_ = true;
+        }
+      }
+      ImGui::Separator();
+      if (ImGui::SmallButton("show all")) {
+        hostile_mob_visible_.fill(true);
+        hostile_filter_dirty_ = true;
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("hide all")) {
+        hostile_mob_visible_.fill(false);
+        hostile_filter_dirty_ = true;
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::PopItemWidth();
+
+    ImGui::Unindent(16.0f);
+  }
   RenderTargetGroupRow(
       "passives", "##esp_passives_color", &passive_group_.enabled, &passive_group_.color);
   RenderTargetGroupRow("items", "##esp_items_color", &item_group_.enabled, &item_group_.color);
@@ -192,6 +300,8 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
       static_cast<double>(max_render_distance_) * static_cast<double>(max_render_distance_);
   ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
 
+  if (hostile_group_.enabled && hostile_filter_dirty_) { RebuildHostileFilter(); }
+
   for (auto entity : ClientWorld::GetEntities(env, ctx.jni_cache, world.get())) {
     if (!entity) { continue; }
     if (local_player && env->IsSameObject(entity.get(), local_player.get()) == JNI_TRUE) {
@@ -214,6 +324,11 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
       box_color = &player_group_.color;
     } else if (hostile_group_.enabled &&
                env->IsInstanceOf(entity.get(), ctx.jni_cache.hostile_entity_class)) {
+      if (!hidden_hostile_keys_.empty()) {
+        if (hidden_hostile_keys_.size() == static_cast<size_t>(kHostileMobCount)) { continue; }
+        std::string key = Entity::GetTranslationKey(env, ctx.jni_cache, entity.get());
+        if (!key.empty() && hidden_hostile_keys_.count(key)) { continue; }
+      }
       box_color = &hostile_group_.color;
     } else if (passive_group_.enabled &&
                env->IsInstanceOf(entity.get(), ctx.jni_cache.passive_entity_class)) {

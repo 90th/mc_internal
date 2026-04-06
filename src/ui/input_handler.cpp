@@ -15,11 +15,6 @@ void ProcessInput(GLFWwindow* window, OverlayContext& ctx) {
     return;
   }
 
-  // Suppress GLFW error callback during our GLFW calls to prevent
-  // transient GLFW_NOT_INITIALIZED errors on early frames.
-  GLFWerrorfun prev_error_callback = nullptr;
-  if (glfw.set_error_callback) { prev_error_callback = glfw.set_error_callback(nullptr); }
-
   ImGuiIO& io = ImGui::GetIO();
 
   const bool insert_is_down = glfw.get_key(window, GLFW_KEY_INSERT) == GLFW_PRESS;
@@ -69,10 +64,6 @@ void ProcessInput(GLFWwindow* window, OverlayContext& ctx) {
     io.AddMousePosEvent(static_cast<float>(mouse_x), static_cast<float>(mouse_y));
     io.AddMouseButtonEvent(0, glfw.get_mouse_button(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
     io.AddMouseButtonEvent(1, glfw.get_mouse_button(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
-  }
-
-  if (glfw.set_error_callback && prev_error_callback) {
-    glfw.set_error_callback(prev_error_callback);
   }
 }
 
