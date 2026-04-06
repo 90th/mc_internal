@@ -1,6 +1,8 @@
 #include "mc_internal/ui/widgets.hpp"
 
+#include <cctype>
 #include <cstdio>
+#include <cstring>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
@@ -189,6 +191,118 @@ void DescriptionText(const char* text) {
   ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
   ImGui::TextWrapped("%s", text);
   ImGui::PopStyleColor();
+}
+
+// ── FilteredChecklist ────────────────────────────────────────────────────────
+
+namespace {
+
+bool CaseInsensitiveContains(const char* haystack, const char* needle) {
+  if (!needle[0]) return true;
+  for (const char* h = haystack; *h; ++h) {
+    const char* hi = h;
+    const char* ni = needle;
+    while (*hi && *ni &&
+           std::tolower(static_cast<unsigned char>(*hi)) ==
+               std::tolower(static_cast<unsigned char>(*ni))) {
+      ++hi;
+      ++ni;
+    }
+    if (!*ni) return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+bool FilteredChecklist(const char* id,
+                       FilteredChecklistState& state,
+                       const char* const* labels,
+                       bool* values,
+                       int count,
+                       float preview_width) {
+  bool changed = false;
+
+  int hidden_count = 0;
+  for (int i = 0; i < count; ++i) {
+    if (!values[i]) ++hidden_count;
+  }
+
+  const int visible_count = count - hidden_count;
+  char preview[32];
+  if (hidden_count == 0) {
+    std::snprintf(preview, sizeof(preview), "all");
+  } else if (visible_count == 0) {
+    std::snprintf(preview, sizeof(preview), "none");
+  } else {
+    std::snprintf(preview, sizeof(preview), "%d/%d", visible_count, count);
+  }
+
+  ImGui::PushItemWidth(preview_width);
+  const char* popup_id = id;
+
+  if (ImGui::Button(preview, ImVec2(preview_width, 0))) {
+    ImGui::OpenPopup(popup_id);
+    state.popup_open = true;
+    state.search_buf[0] = '\0';
+  }
+  ImGui::PopItemWidth();
+
+  constexpr float kPopupWidth = 220.0f;
+  constexpr float kListHeight = 200.0f;
+
+  ImGui::SetNextWindowSize(ImVec2(kPopupWidth, 0.0f));
+  if (ImGui::BeginPopup(popup_id)) {
+    ImGui::PushItemWidth(-1.0f);
+    if (state.popup_open) {
+      ImGui::SetKeyboardFocusHere();
+      state.popup_open = false;
+    }
+    ImGui::InputTextWithHint("##search", "search...", state.search_buf, sizeof(state.search_buf));
+    ImGui::PopItemWidth();
+
+    ImGui::Spacing();
+
+    if (ImGui::BeginChild("##list", ImVec2(0.0f, kListHeight), ImGuiChildFlags_None)) {
+      int matches = 0;
+      for (int i = 0; i < count; ++i) {
+        if (state.search_buf[0] && !CaseInsensitiveContains(labels[i], state.search_buf)) {
+          continue;
+        }
+        ++matches;
+        if (ImGui::Checkbox(labels[i], &values[i])) { changed = true; }
+      }
+      if (matches == 0) { ImGui::TextDisabled("no matches"); }
+    }
+    ImGui::EndChild();
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    const float avail = ImGui::GetContentRegionAvail().x;
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float btn_w = (avail - spacing * 2.0f) / 3.0f;
+
+    if (ImGui::Button("show", ImVec2(btn_w, 0))) {
+      for (int i = 0; i < count; ++i) values[i] = true;
+      changed = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("hide", ImVec2(btn_w, 0))) {
+      for (int i = 0; i < count; ++i) values[i] = false;
+      changed = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("invert", ImVec2(btn_w, 0))) {
+      for (int i = 0; i < count; ++i) values[i] = !values[i];
+      changed = true;
+    }
+
+    ImGui::EndPopup();
+  }
+
+  return changed;
 }
 
 }  // namespace mc_internal::ui

@@ -5,6 +5,7 @@
 #include <unordered_set>
 
 #include "mc_internal/features/module.hpp"
+#include "mc_internal/ui/widgets.hpp"
 
 namespace mc_internal {
 
@@ -34,6 +35,7 @@ class EspModule : public Module {
   std::array<bool, kHostileMobCount> hostile_mob_visible_{};
   std::unordered_set<std::string_view> hidden_hostile_keys_;
   bool hostile_filter_dirty_ = true;
+  ui::FilteredChecklistState hostile_checklist_state_{};
 };
 
 }  // namespace mc_internal

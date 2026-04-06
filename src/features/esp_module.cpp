@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstdio>
 #include <string>
 #include <unordered_set>
 
@@ -197,42 +196,23 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
   if (hostile_group_.enabled) {
     ImGui::Indent(16.0f);
 
-    int hidden_count = 0;
-    for (bool v : hostile_mob_visible_) {
-      if (!v) ++hidden_count;
-    }
-
-    const char* preview;
-    char preview_buf[32];
-    if (hidden_count == 0) {
-      preview = "all";
-    } else if (hidden_count == kHostileMobCount) {
-      preview = "none";
-    } else {
-      std::snprintf(preview_buf, sizeof(preview_buf), "%d hidden", hidden_count);
-      preview = preview_buf;
-    }
-
-    ImGui::PushItemWidth(80.0f);
-    if (ImGui::BeginCombo("##esp_hostile_filter", preview)) {
+    static const char* hostile_labels[kHostileMobCount];
+    static bool labels_init = false;
+    if (!labels_init) {
       for (int i = 0; i < kHostileMobCount; ++i) {
-        if (ImGui::Checkbox(kHostileMobs[i].display_label, &hostile_mob_visible_[i])) {
-          hostile_filter_dirty_ = true;
-        }
+        hostile_labels[i] = kHostileMobs[i].display_label;
       }
-      ImGui::Separator();
-      if (ImGui::SmallButton("show all")) {
-        hostile_mob_visible_.fill(true);
-        hostile_filter_dirty_ = true;
-      }
-      ImGui::SameLine();
-      if (ImGui::SmallButton("hide all")) {
-        hostile_mob_visible_.fill(false);
-        hostile_filter_dirty_ = true;
-      }
-      ImGui::EndCombo();
+      labels_init = true;
     }
-    ImGui::PopItemWidth();
+
+    if (ui::FilteredChecklist("##esp_hostile_filter",
+                              hostile_checklist_state_,
+                              hostile_labels,
+                              hostile_mob_visible_.data(),
+                              kHostileMobCount,
+                              90.0f)) {
+      hostile_filter_dirty_ = true;
+    }
 
     ImGui::Unindent(16.0f);
   }
