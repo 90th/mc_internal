@@ -8,6 +8,7 @@
 #include "imgui_internal.h"
 
 #include "mc_internal/features/module.hpp"
+#include "mc_internal/ui/anim.hpp"
 #include "mc_internal/ui/widgets.hpp"
 
 namespace mc_internal {
@@ -152,8 +153,31 @@ void RenderMenu(GLFWwindow* window, const OverlayContext& ctx) {
                                                            ModuleCategory::kMisc};
 
     float btn_y = sep_y + 10.0f;
+    const float btn_y_start = btn_y;
     constexpr float kBtnHeight = 26.0f;
     constexpr float kBtnPad = 2.0f;
+
+    // animated indicator Y offset (relative to first button Y)
+    static float indicator_offset = 0.0f;
+    static bool indicator_initialized = false;
+    float target_offset = 0.0f;
+
+    // find the target offset for the selected category
+    {
+      float off = 0.0f;
+      for (ModuleCategory category : kCategories) {
+        if (category == selected_category) { target_offset = off; }
+        off += kBtnHeight + kBtnPad;
+      }
+    }
+
+    if (!indicator_initialized) {
+      indicator_offset = target_offset;
+      indicator_initialized = true;
+    } else {
+      const float dt = ImGui::GetIO().DeltaTime;
+      indicator_offset += (target_offset - indicator_offset) * std::min(12.0f * dt, 1.0f);
+    }
 
     for (ModuleCategory category : kCategories) {
       const char* name = ToDisplayName(category);
@@ -171,20 +195,33 @@ void RenderMenu(GLFWwindow* window, const OverlayContext& ctx) {
 
       if (is_selected) {
         dl->AddRectFilled(btn_min, btn_max, kSidebarActive, 3.0f);
-        dl->AddRectFilled(ImVec2(btn_min.x, btn_min.y + 3.0f),
-                          ImVec2(btn_min.x + 3.0f, btn_max.y - 3.0f),
-                          kAccent,
-                          1.5f);
       } else if (hovered) {
         dl->AddRectFilled(btn_min, btn_max, kSidebarHover, 3.0f);
       }
 
+      // animated text color per button
+      const ImGuiID color_id = ImGui::GetID(name);
+      const float sel_t = ui::Anim::Get(color_id, is_selected ? 1.0f : 0.0f, 8.0f);
+      ImU32 text_col;
+      if (sel_t > 0.01f) {
+        text_col = ui::LerpColor(hovered ? kTextBright : kTextMid, kAccent, sel_t);
+      } else {
+        text_col = hovered ? kTextBright : kTextMid;
+      }
+
       const ImVec2 text_size = ImGui::CalcTextSize(name, nullptr, true);
       const ImVec2 text_pos(btn_min.x + 14.0f, btn_min.y + (kBtnHeight - text_size.y) * 0.5f);
-      dl->AddText(text_pos, is_selected ? kAccent : (hovered ? kTextBright : kTextMid), name);
+      dl->AddText(text_pos, text_col, name);
 
       btn_y += kBtnHeight + kBtnPad;
     }
+
+    // draw the sliding accent indicator at the animated Y
+    const float ind_y = btn_y_start + indicator_offset;
+    dl->AddRectFilled(ImVec2(sidebar_min.x + 6.0f, ind_y + 3.0f),
+                      ImVec2(sidebar_min.x + 6.0f + 3.0f, ind_y + kBtnHeight - 3.0f),
+                      kAccent,
+                      1.5f);
   }
 
   // ── vertical separator between sidebar and content ─────────────────────

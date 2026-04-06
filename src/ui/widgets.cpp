@@ -6,6 +6,8 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include "mc_internal/ui/anim.hpp"
+
 namespace mc_internal::ui {
 
 // ── palette ──────────────────────────────────────────────────────────────────
@@ -36,19 +38,19 @@ bool Tab(const char* label, bool selected) {
   bool hovered, held;
   const bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
 
-  ImU32 text_color = kTextMid;
-  if (selected) {
-    text_color = kAccent;
-  } else if (hovered) {
-    text_color = kTextBright;
-  }
+  // animated text color: blend between base and accent based on selection
+  const float ct = Anim::Get(id + 0x10000, selected ? 1.0f : 0.0f, 8.0f);
+  const ImU32 text_color = LerpColor(hovered ? kTextBright : kTextMid, kAccent, ct);
 
   const ImVec2 text_pos = ImVec2(pos.x + 7.0f, pos.y + 4.0f);
   window->DrawList->AddText(text_pos, text_color, label);
 
-  if (selected) {
+  // animated underline alpha
+  const float ul = Anim::Get(id + 0x20000, selected ? 1.0f : 0.0f, 8.0f);
+  if (ul > 0.01f) {
+    const ImU32 ul_color = IM_COL32(200, 60, 60, static_cast<int>(255.0f * ul));
     window->DrawList->AddRectFilled(
-        ImVec2(pos.x + 4.0f, bb.Max.y - 2.0f), ImVec2(bb.Max.x - 4.0f, bb.Max.y), kAccent, 1.0f);
+        ImVec2(pos.x + 4.0f, bb.Max.y - 2.0f), ImVec2(bb.Max.x - 4.0f, bb.Max.y), ul_color, 1.0f);
   }
 
   return pressed;
@@ -147,11 +149,16 @@ bool Toggle(const char* label, bool* v) {
   const float track_y = pos.y + (total_height - kToggleH) * 0.5f;
   const ImVec2 track_min(pos.x, track_y);
   const ImVec2 track_max(pos.x + kToggleW, track_y + kToggleH);
-  const ImU32 track_color = *v ? kAccent : kToggleOff;
+
+  // animated knob position and track color
+  const float t = Anim::Get(id, *v ? 1.0f : 0.0f, 8.0f);
+  const ImU32 track_color = LerpColor(kToggleOff, kAccent, t);
   window->DrawList->AddRectFilled(track_min, track_max, track_color, kRounding);
 
   const float knob_pad = (kToggleH - kKnobSize) * 0.5f;
-  const float knob_x = *v ? (track_max.x - kKnobSize - knob_pad) : (track_min.x + knob_pad);
+  const float knob_off = track_min.x + knob_pad;
+  const float knob_on = track_max.x - kKnobSize - knob_pad;
+  const float knob_x = knob_off + (knob_on - knob_off) * t;
   const float knob_y = track_y + knob_pad;
   window->DrawList->AddRectFilled(
       ImVec2(knob_x, knob_y), ImVec2(knob_x + kKnobSize, knob_y + kKnobSize), kTextBright, 2.0f);

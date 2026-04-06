@@ -32,7 +32,8 @@ void ModuleManager::RenderUi(const OverlayContext& ctx) const {
   if (!initialized_) { Initialize(); }
 
   for (const auto& module : modules_) {
-    if (module->is_enabled()) { module->on_render_ui(ctx); }
+    // Always call on_render_ui so modules can animate fade-out when disabled.
+    module->on_render_ui(ctx);
   }
 }
 
