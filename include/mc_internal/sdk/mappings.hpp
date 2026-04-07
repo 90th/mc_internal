@@ -1,5 +1,7 @@
 #pragma once
 
+// Fabric intermediary names for Minecraft 1.21.11.
+
 #include <string_view>
 
 namespace mc_internal {

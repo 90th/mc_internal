@@ -145,6 +145,19 @@ ImU32 ToImColor(const std::array<float, 4>& color) {
   return ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], color[3]));
 }
 
+// RAII guard for JNI PushLocalFrame / PopLocalFrame.  Ensures all local
+// references created within the scope are freed even on early return.
+struct JniLocalFrame {
+  JNIEnv* env;
+  JniLocalFrame(JNIEnv* e, jint capacity) : env(e->PushLocalFrame(capacity) == 0 ? e : nullptr) {}
+  ~JniLocalFrame() {
+    if (env) env->PopLocalFrame(nullptr);
+  }
+  explicit operator bool() const { return env != nullptr; }
+  JniLocalFrame(const JniLocalFrame&) = delete;
+  JniLocalFrame& operator=(const JniLocalFrame&) = delete;
+};
+
 void RenderTargetGroupRow(const char* label,
                           const char* color_id,
                           bool* enabled,
@@ -191,30 +204,35 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
 
   RenderTargetGroupRow(
       "players", "##esp_players_color", &player_group_.enabled, &player_group_.color);
-  RenderTargetGroupRow(
-      "hostiles", "##esp_hostiles_color", &hostile_group_.enabled, &hostile_group_.color);
-  if (hostile_group_.enabled) {
-    ImGui::Indent(16.0f);
+  {
+    const float color_button_size = ImGui::GetFrameHeight();
+    ImGui::Checkbox("hostiles", &hostile_group_.enabled);
+    if (hostile_group_.enabled) {
+      ImGui::SameLine();
 
-    static const char* hostile_labels[kHostileMobCount];
-    static bool labels_init = false;
-    if (!labels_init) {
-      for (int i = 0; i < kHostileMobCount; ++i) {
-        hostile_labels[i] = kHostileMobs[i].display_label;
+      static const char* hostile_labels[kHostileMobCount];
+      static bool labels_init = false;
+      if (!labels_init) {
+        for (int i = 0; i < kHostileMobCount; ++i) {
+          hostile_labels[i] = kHostileMobs[i].display_label;
+        }
+        labels_init = true;
       }
-      labels_init = true;
-    }
 
-    if (ui::FilteredChecklist("##esp_hostile_filter",
-                              hostile_checklist_state_,
-                              hostile_labels,
-                              hostile_mob_visible_.data(),
-                              kHostileMobCount,
-                              90.0f)) {
-      hostile_filter_dirty_ = true;
+      if (ui::FilteredChecklist("##esp_hostile_filter",
+                                hostile_checklist_state_,
+                                hostile_labels,
+                                hostile_mob_visible_.data(),
+                                kHostileMobCount,
+                                90.0f)) {
+        hostile_filter_dirty_ = true;
+      }
     }
-
-    ImGui::Unindent(16.0f);
+    ImGui::SameLine();
+    const float current_x = ImGui::GetCursorPosX();
+    const float color_x = current_x + ImGui::GetContentRegionAvail().x - color_button_size;
+    ImGui::SetCursorPosX(std::max(current_x, color_x));
+    ImGui::ColorEdit4("##esp_hostiles_color", hostile_group_.color.data(), kGroupColorEditFlags);
   }
   RenderTargetGroupRow(
       "passives", "##esp_passives_color", &passive_group_.enabled, &passive_group_.color);
@@ -284,6 +302,9 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
 
   for (auto entity : ClientWorld::GetEntities(env, ctx.jni_cache, world.get())) {
     if (!entity) { continue; }
+    JniLocalFrame frame(env.get(), 16);
+    if (!frame) { continue; }
+
     if (local_player && env->IsSameObject(entity.get(), local_player.get()) == JNI_TRUE) {
       continue;
     }
