@@ -442,6 +442,12 @@ EntityData Entity::GetData(const JniEnv& env, const JniCache& cache, jobject ent
                                 kEntityClass,
                                 kEntityGetHeightMethod,
                                 kEntityGetHeightSignature);
+  data.width = CallFloatMethod(env,
+                               entity,
+                               cache.entity_get_width,
+                               kEntityClass,
+                               kEntityGetWidthMethod,
+                               kEntityGetWidthSignature);
   return data;
 }
 

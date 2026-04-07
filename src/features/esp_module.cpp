@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <unordered_set>
 
 #include "imgui.h"
@@ -20,9 +21,13 @@ namespace {
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kMinRenderDistance = 16.0f;
 constexpr float kMaxRenderDistance = 512.0f;
+constexpr float kMinBoxSize = 4.0f;
 constexpr ImGuiColorEditFlags kGroupColorEditFlags =
     ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_AlphaPreview |
     ImGuiColorEditFlags_NoTooltip;
+
+constexpr int kEspStyleCorner = 0;
+constexpr int kEspStyleBox = 1;
 
 struct HostileMobEntry {
   const char* translation_key;
@@ -144,8 +149,6 @@ ImU32 ToImColor(const std::array<float, 4>& color) {
   return ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], color[3]));
 }
 
-// RAII guard for JNI PushLocalFrame / PopLocalFrame.  Ensures all local
-// references created within the scope are freed even on early return.
 struct JniLocalFrame {
   JNIEnv* env;
   JniLocalFrame(JNIEnv* e, jint capacity) : env(e->PushLocalFrame(capacity) == 0 ? e : nullptr) {}
@@ -157,13 +160,45 @@ struct JniLocalFrame {
   JniLocalFrame& operator=(const JniLocalFrame&) = delete;
 };
 
+void DrawCornerEsp(ImDrawList* dl,
+                   const ImVec2& mn,
+                   const ImVec2& mx,
+                   ImU32 color,
+                   ImU32 shadow_color,
+                   float thickness) {
+  float cl = std::min(mx.x - mn.x, mx.y - mn.y) * 0.25f;
+  cl = std::max(cl, 4.0f);
+
+  auto draw = [&](ImU32 c, float t) {
+    dl->AddLine(ImVec2(mn.x, mn.y), ImVec2(mn.x + cl, mn.y), c, t);
+    dl->AddLine(ImVec2(mn.x, mn.y), ImVec2(mn.x, mn.y + cl), c, t);
+    dl->AddLine(ImVec2(mx.x, mn.y), ImVec2(mx.x - cl, mn.y), c, t);
+    dl->AddLine(ImVec2(mx.x, mn.y), ImVec2(mx.x, mn.y + cl), c, t);
+    dl->AddLine(ImVec2(mn.x, mx.y), ImVec2(mn.x + cl, mx.y), c, t);
+    dl->AddLine(ImVec2(mn.x, mx.y), ImVec2(mn.x, mx.y - cl), c, t);
+    dl->AddLine(ImVec2(mx.x, mx.y), ImVec2(mx.x - cl, mx.y), c, t);
+    dl->AddLine(ImVec2(mx.x, mx.y), ImVec2(mx.x, mx.y - cl), c, t);
+  };
+
+  draw(shadow_color, thickness + 2.0f);
+  draw(color, thickness);
+}
+
 void RenderTargetGroupRow(const char* label,
                           const char* color_id,
+                          const char* style_id,
                           bool* enabled,
-                          std::array<float, 4>* color) {
+                          std::array<float, 4>* color,
+                          int* style) {
   const float color_button_size = ImGui::GetFrameHeight();
 
   ImGui::Checkbox(label, enabled);
+  if (*enabled) {
+    ImGui::SameLine();
+    ImGui::PushItemWidth(72.0f);
+    ImGui::Combo(style_id, style, "corner\0box\0");
+    ImGui::PopItemWidth();
+  }
 
   ImGui::SameLine();
   const float current_x = ImGui::GetCursorPosX();
@@ -201,8 +236,12 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
 
   ui::SectionHeader("target groups");
 
-  RenderTargetGroupRow(
-      "players", "##esp_players_color", &player_group_.enabled, &player_group_.color);
+  RenderTargetGroupRow("players",
+                       "##esp_players_color",
+                       "##esp_players_style",
+                       &player_group_.enabled,
+                       &player_group_.color,
+                       &player_group_.style);
   {
     const float color_button_size = ImGui::GetFrameHeight();
     ImGui::Checkbox("hostiles", &hostile_group_.enabled);
@@ -226,6 +265,11 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
                                 90.0f)) {
         hostile_filter_dirty_ = true;
       }
+
+      ImGui::SameLine();
+      ImGui::PushItemWidth(72.0f);
+      ImGui::Combo("##esp_hostile_style", &hostile_group_.style, "corner\0box\0");
+      ImGui::PopItemWidth();
     }
     ImGui::SameLine();
     const float current_x = ImGui::GetCursorPosX();
@@ -233,9 +277,26 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
     ImGui::SetCursorPosX(std::max(current_x, color_x));
     ImGui::ColorEdit4("##esp_hostiles_color", hostile_group_.color.data(), kGroupColorEditFlags);
   }
-  RenderTargetGroupRow(
-      "passives", "##esp_passives_color", &passive_group_.enabled, &passive_group_.color);
-  RenderTargetGroupRow("items", "##esp_items_color", &item_group_.enabled, &item_group_.color);
+  RenderTargetGroupRow("passives",
+                       "##esp_passives_color",
+                       "##esp_passives_style",
+                       &passive_group_.enabled,
+                       &passive_group_.color,
+                       &passive_group_.style);
+  RenderTargetGroupRow("items",
+                       "##esp_items_color",
+                       "##esp_items_style",
+                       &item_group_.enabled,
+                       &item_group_.color,
+                       &item_group_.style);
+
+  ui::SectionHeader("appearance");
+
+  ImGui::PushItemWidth(-1.0f);
+  ui::SliderFloat("##esp_line_thickness", &line_thickness_, 0.5f, 4.0f, "%.1f px");
+  ImGui::PopItemWidth();
+
+  ui::Toggle("show distance", &show_distance_);
 
   ui::SectionHeader("render distance");
 
@@ -308,8 +369,6 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
       continue;
     }
 
-    // extract coordinates first for early distance culling (3 jni calls).
-    // avoids 6+ jni calls per entity when distance check fails.
     auto [entity_x, entity_y, entity_z] = Entity::GetCoordinates(env, ctx.jni_cache, entity.get());
 
     const double dx = entity_x - camera_position.x;
@@ -320,10 +379,10 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
 
     if (!Entity::IsAlive(env, ctx.jni_cache, entity.get())) { continue; }
 
-    const std::array<float, 4>* box_color = nullptr;
+    const TargetGroupState* group = nullptr;
     if (player_group_.enabled &&
         env->IsInstanceOf(entity.get(), ctx.jni_cache.client_player_entity_class)) {
-      box_color = &player_group_.color;
+      group = &player_group_;
     } else if (hostile_group_.enabled &&
                env->IsInstanceOf(entity.get(), ctx.jni_cache.hostile_entity_class)) {
       if (!hidden_hostile_keys_.empty()) {
@@ -332,15 +391,15 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
           continue;
         }
       }
-      box_color = &hostile_group_.color;
+      group = &hostile_group_;
     } else if (passive_group_.enabled &&
                env->IsInstanceOf(entity.get(), ctx.jni_cache.passive_entity_class)) {
-      box_color = &passive_group_.color;
+      group = &passive_group_;
     } else if (item_group_.enabled &&
                env->IsInstanceOf(entity.get(), ctx.jni_cache.item_entity_class)) {
-      box_color = &item_group_.color;
+      group = &item_group_;
     }
-    if (box_color == nullptr) { continue; }
+    if (group == nullptr) { continue; }
 
     const EntityData entity_data = Entity::GetData(env, ctx.jni_cache, entity.get());
 
@@ -348,39 +407,92 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
     const double lerped_y = Lerp(entity_data.prev_y, entity_y, tick_delta);
     const double lerped_z = Lerp(entity_data.prev_z, entity_z, tick_delta);
 
-    const Vec3 feet = {lerped_x, lerped_y, lerped_z};
-    const Vec3 head = {
-        lerped_x, lerped_y + static_cast<double>(entity_data.height) + 0.2, lerped_z};
+    float hw = entity_data.width * 0.5f;
+    if (hw < 0.05f) hw = 0.3f;
+    const double top_y = lerped_y + static_cast<double>(entity_data.height) + 0.1;
 
-    Vec2 feet_screen = {};
-    Vec2 head_screen = {};
-    if (!WorldToScreen(feet,
-                       view_matrix.data(),
-                       projection_matrix.data(),
-                       ctx.display_width,
-                       ctx.display_height,
-                       feet_screen) ||
-        !WorldToScreen(head,
-                       view_matrix.data(),
-                       projection_matrix.data(),
-                       ctx.display_width,
-                       ctx.display_height,
-                       head_screen)) {
-      continue;
+    const Vec3 corners[8] = {
+        {lerped_x - hw, lerped_y, lerped_z - hw},
+        {lerped_x + hw, lerped_y, lerped_z - hw},
+        {lerped_x - hw, lerped_y, lerped_z + hw},
+        {lerped_x + hw, lerped_y, lerped_z + hw},
+        {lerped_x - hw, top_y, lerped_z - hw},
+        {lerped_x + hw, top_y, lerped_z - hw},
+        {lerped_x - hw, top_y, lerped_z + hw},
+        {lerped_x + hw, top_y, lerped_z + hw},
+    };
+
+    float smin_x = 1e30f, smin_y = 1e30f;
+    float smax_x = -1e30f, smax_y = -1e30f;
+    bool valid = true;
+
+    for (int i = 0; i < 8; ++i) {
+      Vec2 sp;
+      if (!WorldToScreen(corners[i],
+                         view_matrix.data(),
+                         projection_matrix.data(),
+                         ctx.display_width,
+                         ctx.display_height,
+                         sp)) {
+        valid = false;
+        break;
+      }
+      smin_x = std::min(smin_x, sp.x);
+      smin_y = std::min(smin_y, sp.y);
+      smax_x = std::max(smax_x, sp.x);
+      smax_y = std::max(smax_y, sp.y);
     }
 
-    const float top = std::min(head_screen.y, feet_screen.y);
-    const float bottom = std::max(head_screen.y, feet_screen.y);
-    const float height = bottom - top;
-    if (height < 4.0f) { continue; }
+    if (!valid) { continue; }
 
-    const float half_width = height * 0.25f;
-    draw_list->AddRect(ImVec2(head_screen.x - half_width, top),
-                       ImVec2(head_screen.x + half_width, bottom),
-                       ToImColor(*box_color),
-                       0.0f,
-                       0,
-                       1.5f);
+    const float proj_w = smax_x - smin_x;
+    const float proj_h = smax_y - smin_y;
+    const float size_alpha = std::clamp(std::min(proj_w, proj_h) / kMinBoxSize, 0.0f, 1.0f);
+
+    if (proj_w < kMinBoxSize) {
+      const float cx = (smin_x + smax_x) * 0.5f;
+      smin_x = cx - kMinBoxSize * 0.5f;
+      smax_x = cx + kMinBoxSize * 0.5f;
+    }
+    if (proj_h < kMinBoxSize) {
+      const float cy = (smin_y + smax_y) * 0.5f;
+      smin_y = cy - kMinBoxSize * 0.5f;
+      smax_y = cy + kMinBoxSize * 0.5f;
+    }
+
+    const float distance = std::sqrt(static_cast<float>(distance_sq));
+    float alpha_mult = 1.0f;
+    const float fade_start = max_render_distance_ * 0.5f;
+    if (distance > fade_start) {
+      alpha_mult = 1.0f - (distance - fade_start) / (max_render_distance_ - fade_start);
+      alpha_mult = std::clamp(alpha_mult, 0.0f, 1.0f);
+    }
+    alpha_mult *= size_alpha;
+
+    std::array<float, 4> adj_color = group->color;
+    adj_color[3] *= alpha_mult;
+    const ImU32 im_color = ToImColor(adj_color);
+    const ImU32 shadow_color = IM_COL32(0, 0, 0, static_cast<int>(180.0f * alpha_mult));
+
+    const ImVec2 box_min(smin_x, smin_y);
+    const ImVec2 box_max(smax_x, smax_y);
+
+    if (group->style == kEspStyleCorner) {
+      DrawCornerEsp(draw_list, box_min, box_max, im_color, shadow_color, line_thickness_);
+    } else {
+      draw_list->AddRect(box_min, box_max, shadow_color, 0.0f, 0, line_thickness_ + 2.0f);
+      draw_list->AddRect(box_min, box_max, im_color, 0.0f, 0, line_thickness_);
+    }
+
+    if (show_distance_) {
+      char dist_buf[16];
+      std::snprintf(dist_buf, sizeof(dist_buf), "%.0f", distance);
+      const ImVec2 text_size = ImGui::CalcTextSize(dist_buf);
+      const float text_x = (smin_x + smax_x) * 0.5f - text_size.x * 0.5f;
+      const float text_y = smax_y + 2.0f;
+      draw_list->AddText(ImVec2(text_x + 1.0f, text_y + 1.0f), shadow_color, dist_buf);
+      draw_list->AddText(ImVec2(text_x, text_y), im_color, dist_buf);
+    }
   }
 }
 

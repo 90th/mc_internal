@@ -22,6 +22,7 @@ struct EntityData {
   double prev_y = 0.0;
   double prev_z = 0.0;
   float height = 0.0f;
+  float width = 0.0f;
 };
 
 class Minecraft {

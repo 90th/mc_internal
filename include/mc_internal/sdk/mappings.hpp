@@ -8,7 +8,7 @@ namespace mc_internal {
 
 inline constexpr std::string_view kMinecraftClientClass = "net/minecraft/class_310";
 inline constexpr std::string_view kEntityClass = "net/minecraft/class_1297";
-inline constexpr std::string_view kClientPlayerEntityClass = "net/minecraft/class_746";
+inline constexpr std::string_view kClientPlayerEntityClass = "net/minecraft/class_742";
 inline constexpr std::string_view kClientWorldClass = "net/minecraft/class_638";
 inline constexpr std::string_view kGameRendererClass = "net/minecraft/class_757";
 inline constexpr std::string_view kCameraClass = "net/minecraft/class_4184";
@@ -62,6 +62,8 @@ inline constexpr std::string_view kEntityGetLastRenderPosMethod = "method_61411"
 inline constexpr std::string_view kEntityGetLastRenderPosSignature = "()Lnet/minecraft/class_243;";
 inline constexpr std::string_view kEntityGetHeightMethod = "method_17682";
 inline constexpr std::string_view kEntityGetHeightSignature = "()F";
+inline constexpr std::string_view kEntityGetWidthMethod = "method_17681";
+inline constexpr std::string_view kEntityGetWidthSignature = "()F";
 inline constexpr std::string_view kEntityGetTypeMethod = "method_5864";
 inline constexpr std::string_view kEntityGetTypeSignature = "()Lnet/minecraft/class_1299;";
 

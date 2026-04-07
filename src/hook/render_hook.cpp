@@ -1,7 +1,10 @@
 #include "mc_internal/hook/render_hook.hpp"
 
+#include <array>
 #include <atomic>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <memory>
 #include <print>
 
@@ -32,15 +35,37 @@ namespace mc_internal {
 
 namespace {
 
-GlfwSwapBuffersFn g_original_swap_buffers = nullptr;
-lm_size_t g_hook_size = 0;
+// 14-byte absolute jump: FF 25 00 00 00 00 <8-byte address>
+constexpr std::size_t kHookStubSize = 14;
+
+struct SwapBuffersHook {
+  void* target = nullptr;
+  std::array<unsigned char, kHookStubSize> original_bytes{};
+  std::array<unsigned char, kHookStubSize> hook_bytes{};
+};
+
+SwapBuffersHook g_hook{};
 std::unique_ptr<OverlayContext> g_ctx;
+
+void WriteBytes(const unsigned char* bytes) {
+  lm_prot_t old_prot{};
+  auto addr = reinterpret_cast<lm_address_t>(g_hook.target);
+  LM_ProtMemory(addr, kHookStubSize, LM_PROT_XRW, &old_prot);
+  std::memcpy(g_hook.target, bytes, kHookStubSize);
+  LM_ProtMemory(addr, kHookStubSize, old_prot, nullptr);
+}
+
+void CallOriginalSwapBuffers(GLFWwindow* window) {
+  WriteBytes(g_hook.original_bytes.data());
+  reinterpret_cast<GlfwSwapBuffersFn>(g_hook.target)(window);
+  WriteBytes(g_hook.hook_bytes.data());
+}
 
 void HkGlfwSwapBuffers(GLFWwindow* window) {
   std::atomic_thread_fence(std::memory_order_acquire);
 
   if (!g_ctx) {
-    g_original_swap_buffers(window);
+    CallOriginalSwapBuffers(window);
     return;
   }
 
@@ -74,7 +99,7 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
 
   if (display_w < 100 || display_h < 100) {
     restore_error_cb();
-    g_original_swap_buffers(window);
+    CallOriginalSwapBuffers(window);
     return;
   }
 
@@ -89,7 +114,7 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
 
   if (window != g_ctx->pinned_window) {
     restore_error_cb();
-    g_original_swap_buffers(window);
+    CallOriginalSwapBuffers(window);
     return;
   }
 
@@ -100,7 +125,7 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
 
   if (!EnsureImGuiInitialized(*g_ctx)) {
     restore_error_cb();
-    g_original_swap_buffers(window);
+    CallOriginalSwapBuffers(window);
     return;
   }
 
@@ -195,7 +220,7 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
 
   restore_error_cb();
 
-  g_original_swap_buffers(window);
+  CallOriginalSwapBuffers(window);
 }
 
 }  // namespace
@@ -206,27 +231,26 @@ std::expected<void, BootstrapError> InstallRenderHook(JavaVM* jvm) {
     return std::unexpected(BootstrapError::kSwapBuffersLookupFailed);
   }
 
-  // populate the context before the hook goes live so the render thread
-  // doesn't race against uninitialized state.
   g_ctx = std::make_unique<OverlayContext>();
   g_ctx->jvm = jvm;
   g_ctx->glfw = std::move(lookup.functions);
 
-  // ensure all writes to g_ctx are visible to the render thread before the
-  // hook goes live — the render thread reads g_ctx after an acquire fence.
   std::atomic_thread_fence(std::memory_order_release);
 
-  static_assert(sizeof(GlfwSwapBuffersFn) == sizeof(lm_address_t));
+  // Save original bytes and install 14-byte absolute jump.
+  g_hook.target = lookup.swap_buffers_address;
+  std::memcpy(g_hook.original_bytes.data(), g_hook.target, kHookStubSize);
 
-  lm_address_t trampoline = LM_ADDRESS_BAD;
-  g_hook_size = LM_HookCode(reinterpret_cast<lm_address_t>(lookup.swap_buffers_address),
-                            reinterpret_cast<lm_address_t>(&HkGlfwSwapBuffers),
-                            &trampoline);
-  if (g_hook_size == 0 || trampoline == LM_ADDRESS_BAD) {
-    return std::unexpected(BootstrapError::kSwapBuffersLookupFailed);
-  }
+  g_hook.hook_bytes[0] = 0xFF;
+  g_hook.hook_bytes[1] = 0x25;
+  g_hook.hook_bytes[2] = 0x00;
+  g_hook.hook_bytes[3] = 0x00;
+  g_hook.hook_bytes[4] = 0x00;
+  g_hook.hook_bytes[5] = 0x00;
+  auto hook_addr = reinterpret_cast<std::uintptr_t>(&HkGlfwSwapBuffers);
+  std::memcpy(&g_hook.hook_bytes[6], &hook_addr, 8);
 
-  g_original_swap_buffers = reinterpret_cast<GlfwSwapBuffersFn>(trampoline);
+  WriteBytes(g_hook.hook_bytes.data());
   return {};
 }
 

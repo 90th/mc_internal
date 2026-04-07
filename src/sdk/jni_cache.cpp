@@ -134,6 +134,8 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
       entity_class, kEntityGetLastRenderPosMethod, kEntityGetLastRenderPosSignature, kEntityClass);
   entity_get_height = env.GetMethodID(
       entity_class, kEntityGetHeightMethod, kEntityGetHeightSignature, kEntityClass);
+  entity_get_width =
+      env.GetMethodID(entity_class, kEntityGetWidthMethod, kEntityGetWidthSignature, kEntityClass);
   entity_get_type =
       env.GetMethodID(entity_class, kEntityGetTypeMethod, kEntityGetTypeSignature, kEntityClass);
 
@@ -151,7 +153,7 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
   if (minecraft_client_get_instance == nullptr || minecraft_client_player_field == nullptr ||
       minecraft_client_world_field == nullptr || minecraft_client_game_renderer_field == nullptr ||
       minecraft_client_get_render_tick_counter == nullptr || client_world_get_entities == nullptr ||
-      entity_is_alive == nullptr || entity_get_height == nullptr ||
+      entity_is_alive == nullptr || entity_get_height == nullptr || entity_get_width == nullptr ||
       entity_get_last_render_pos == nullptr || game_renderer_get_camera == nullptr ||
       game_renderer_get_fov == nullptr || camera_pos_field == nullptr ||
       camera_get_pitch == nullptr || camera_get_yaw == nullptr ||
@@ -230,6 +232,7 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   entity_is_alive = nullptr;
   entity_get_last_render_pos = nullptr;
   entity_get_height = nullptr;
+  entity_get_width = nullptr;
   entity_get_type = nullptr;
   entity_type_translation_key_field = nullptr;
   game_renderer_get_camera = nullptr;
