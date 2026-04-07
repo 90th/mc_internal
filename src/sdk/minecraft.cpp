@@ -17,17 +17,9 @@ ScopedLocalRef<jobject> GetObjectFieldReference(const JniEnv& env,
   if (!env || object == nullptr || field_id == nullptr) { return {}; }
 
   if (jobject reference = env->GetObjectField(object, field_id); reference != nullptr) {
-    if (!env->ExceptionCheck()) { return env.TakeLocal(reference); }
-
-    env->DeleteLocalRef(reference);
+    return env.TakeLocal(reference);
   }
 
-  if (!env->ExceptionCheck()) { return {}; }
-
-  (void)env.ClearException("get object field");
-  std::println(
-      "{} jni get object field failed: {}.{} {}", kLogPrefix, owner, field_name, signature);
-  std::fflush(stdout);
   return {};
 }
 
@@ -62,14 +54,7 @@ float CallFloatMethod(const JniEnv& env,
                       std::string_view signature) {
   if (!env || object == nullptr || method_id == nullptr) { return 0.0f; }
 
-  const jfloat value = env->CallFloatMethod(object, method_id);
-  if (!env->ExceptionCheck()) { return static_cast<float>(value); }
-
-  (void)env.ClearException("call float method");
-  std::println(
-      "{} jni call float method failed: {}.{} {}", kLogPrefix, owner, method_name, signature);
-  std::fflush(stdout);
-  return 0.0f;
+  return static_cast<float>(env->CallFloatMethod(object, method_id));
 }
 
 bool CallBooleanMethod(const JniEnv& env,
@@ -80,14 +65,7 @@ bool CallBooleanMethod(const JniEnv& env,
                        std::string_view signature) {
   if (!env || object == nullptr || method_id == nullptr) { return false; }
 
-  const jboolean value = env->CallBooleanMethod(object, method_id);
-  if (!env->ExceptionCheck()) { return value == JNI_TRUE; }
-
-  (void)env.ClearException("call boolean method");
-  std::println(
-      "{} jni call boolean method failed: {}.{} {}", kLogPrefix, owner, method_name, signature);
-  std::fflush(stdout);
-  return false;
+  return env->CallBooleanMethod(object, method_id) == JNI_TRUE;
 }
 
 double GetDoubleField(const JniEnv& env,
@@ -98,14 +76,7 @@ double GetDoubleField(const JniEnv& env,
                       std::string_view signature) {
   if (!env || object == nullptr || field_id == nullptr) { return 0.0; }
 
-  const jdouble value = env->GetDoubleField(object, field_id);
-  if (!env->ExceptionCheck()) { return static_cast<double>(value); }
-
-  (void)env.ClearException("get double field");
-  std::println(
-      "{} jni get double field failed: {}.{} {}", kLogPrefix, owner, field_name, signature);
-  std::fflush(stdout);
-  return 0.0;
+  return static_cast<double>(env->GetDoubleField(object, field_id));
 }
 
 Vec3 ReadVec3d(const JniEnv& env, const JniCache& cache, jobject vec3d_object) {
@@ -141,17 +112,7 @@ double CallEntityCoordinateMethod(const JniEnv& env,
                                   std::string_view method_name) {
   if (!env || entity == nullptr || method_id == nullptr) { return 0.0; }
 
-  const jdouble value = env->CallDoubleMethod(entity, method_id);
-  if (!env->ExceptionCheck()) { return static_cast<double>(value); }
-
-  (void)env.ClearException("call double method");
-  std::println("{} jni call double method failed: {}.{} {}",
-               kLogPrefix,
-               kEntityClass,
-               method_name,
-               kEntityGetCoordSignature);
-  std::fflush(stdout);
-  return 0.0;
+  return static_cast<double>(env->CallDoubleMethod(entity, method_id));
 }
 
 }  // namespace
@@ -385,6 +346,14 @@ Entity::GetCoordinates(const JniEnv& env, const JniCache& cache, jobject entity)
           CallEntityCoordinateMethod(env, entity, cache.entity_get_z, kEntityGetZMethod)};
 }
 
+bool Entity::IsAlive(const JniEnv& env, const JniCache& cache, jobject entity) {
+  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_is_alive == nullptr) {
+    return false;
+  }
+
+  return env->CallBooleanMethod(entity, cache.entity_is_alive) == JNI_TRUE;
+}
+
 std::string Entity::GetTranslationKey(const JniEnv& env, const JniCache& cache, jobject entity) {
   if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_get_type == nullptr ||
       cache.entity_type_translation_key_field == nullptr) {
@@ -416,19 +385,43 @@ std::string Entity::GetTranslationKey(const JniEnv& env, const JniCache& cache, 
   return result;
 }
 
+bool Entity::IsTranslationKeyInSet(const JniEnv& env,
+                                   const JniCache& cache,
+                                   jobject entity,
+                                   const std::unordered_set<std::string_view>& keys) {
+  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_get_type == nullptr ||
+      cache.entity_type_translation_key_field == nullptr) {
+    return false;
+  }
+
+  auto entity_type = CallObjectMethodReference(env,
+                                               entity,
+                                               cache.entity_get_type,
+                                               kEntityClass,
+                                               kEntityGetTypeMethod,
+                                               kEntityGetTypeSignature);
+  if (!entity_type) { return false; }
+
+  auto jstr = GetObjectFieldReference(env,
+                                      entity_type.get(),
+                                      cache.entity_type_translation_key_field,
+                                      kEntityTypeClass,
+                                      kEntityTypeTranslationKeyField,
+                                      kEntityTypeTranslationKeyFieldSignature);
+  if (!jstr) { return false; }
+
+  auto* raw_str = static_cast<jstring>(jstr.get());
+  const char* utf = env->GetStringUTFChars(raw_str, nullptr);
+  if (utf == nullptr) { return false; }
+
+  const bool found = keys.count(std::string_view(utf)) > 0;
+  env->ReleaseStringUTFChars(raw_str, utf);
+  return found;
+}
+
 EntityData Entity::GetData(const JniEnv& env, const JniCache& cache, jobject entity) {
   EntityData data{};
   if (!env || !cache.is_initialized() || entity == nullptr) { return data; }
-
-  // note: coordinate fetching is done separately via GetCoordinates() for performance.
-  // this method only fetches the heavy data (is_alive, prev positions, height).
-
-  data.is_alive = CallBooleanMethod(env,
-                                    entity,
-                                    cache.entity_is_alive,
-                                    kEntityClass,
-                                    kEntityIsAliveMethod,
-                                    kEntityIsAliveSignature);
 
   auto last_render_pos = CallObjectMethodReference(env,
                                                    entity,

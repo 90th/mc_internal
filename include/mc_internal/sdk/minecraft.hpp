@@ -1,7 +1,9 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <tuple>
+#include <unordered_set>
 
 #include "mc_internal/sdk/jni_cache.hpp"
 #include "mc_internal/sdk/jni_env.hpp"
@@ -72,11 +74,16 @@ class Camera {
 
 class Entity {
  public:
+  [[nodiscard]] static bool IsAlive(const JniEnv& env, const JniCache& cache, jobject entity);
   [[nodiscard]] static EntityData GetData(const JniEnv& env, const JniCache& cache, jobject entity);
   [[nodiscard]] static std::tuple<double, double, double>
   GetCoordinates(const JniEnv& env, const JniCache& cache, jobject entity);
   [[nodiscard]] static std::string
   GetTranslationKey(const JniEnv& env, const JniCache& cache, jobject entity);
+  [[nodiscard]] static bool IsTranslationKeyInSet(const JniEnv& env,
+                                                  const JniCache& cache,
+                                                  jobject entity,
+                                                  const std::unordered_set<std::string_view>& keys);
 };
 
 }  // namespace mc_internal

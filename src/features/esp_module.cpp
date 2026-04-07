@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <string>
 #include <unordered_set>
 
 #include "imgui.h"
@@ -319,6 +318,8 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
     const double distance_sq = dx * dx + dy * dy + dz * dz;
     if (distance_sq > max_render_distance_sq) { continue; }
 
+    if (!Entity::IsAlive(env, ctx.jni_cache, entity.get())) { continue; }
+
     const std::array<float, 4>* box_color = nullptr;
     if (player_group_.enabled &&
         env->IsInstanceOf(entity.get(), ctx.jni_cache.client_player_entity_class)) {
@@ -327,8 +328,9 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
                env->IsInstanceOf(entity.get(), ctx.jni_cache.hostile_entity_class)) {
       if (!hidden_hostile_keys_.empty()) {
         if (hidden_hostile_keys_.size() == static_cast<size_t>(kHostileMobCount)) { continue; }
-        std::string key = Entity::GetTranslationKey(env, ctx.jni_cache, entity.get());
-        if (!key.empty() && hidden_hostile_keys_.count(key)) { continue; }
+        if (Entity::IsTranslationKeyInSet(env, ctx.jni_cache, entity.get(), hidden_hostile_keys_)) {
+          continue;
+        }
       }
       box_color = &hostile_group_.color;
     } else if (passive_group_.enabled &&
@@ -341,7 +343,6 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
     if (box_color == nullptr) { continue; }
 
     const EntityData entity_data = Entity::GetData(env, ctx.jni_cache, entity.get());
-    if (!entity_data.is_alive) { continue; }
 
     const double lerped_x = Lerp(entity_data.prev_x, entity_x, tick_delta);
     const double lerped_y = Lerp(entity_data.prev_y, entity_y, tick_delta);
