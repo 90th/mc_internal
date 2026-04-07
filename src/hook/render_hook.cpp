@@ -1,7 +1,9 @@
 #include "mc_internal/hook/render_hook.hpp"
 
+#include <array>
 #include <atomic>
 #include <cstdio>
+#include <cstring>
 #include <memory>
 #include <print>
 
@@ -32,14 +34,32 @@ namespace mc_internal {
 
 namespace {
 
-GlfwSwapBuffersFn g_original_swap_buffers = nullptr;
+constexpr std::size_t kHookStubSize = 14;
+
+GlfwSwapBuffersFn g_swap_buffers_target = nullptr;
+std::array<unsigned char, kHookStubSize> g_swap_original_bytes{};
+std::array<unsigned char, kHookStubSize> g_swap_hook_bytes{};
 std::unique_ptr<OverlayContext> g_ctx;
+
+void WriteBytesToTarget(const unsigned char* bytes) {
+  lm_prot_t old_prot{};
+  auto addr = reinterpret_cast<lm_address_t>(g_swap_buffers_target);
+  LM_ProtMemory(addr, kHookStubSize, LM_PROT_XRW, &old_prot);
+  std::memcpy(reinterpret_cast<void*>(g_swap_buffers_target), bytes, kHookStubSize);
+  LM_ProtMemory(addr, kHookStubSize, old_prot, nullptr);
+}
+
+void CallOriginalSwapBuffers(GLFWwindow* window) {
+  WriteBytesToTarget(g_swap_original_bytes.data());
+  g_swap_buffers_target(window);
+  WriteBytesToTarget(g_swap_hook_bytes.data());
+}
 
 void HkGlfwSwapBuffers(GLFWwindow* window) {
   std::atomic_thread_fence(std::memory_order_acquire);
 
   if (!g_ctx) {
-    if (g_original_swap_buffers) g_original_swap_buffers(window);
+    CallOriginalSwapBuffers(window);
     return;
   }
 
@@ -49,6 +69,11 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
   if (g_ctx->glfw.set_error_callback) {
     prev_error_callback = g_ctx->glfw.set_error_callback(nullptr);
   }
+  auto restore_error_cb = [&] {
+    if (g_ctx->glfw.set_error_callback && prev_error_callback) {
+      g_ctx->glfw.set_error_callback(prev_error_callback);
+    }
+  };
 
   int display_w = 0;
   int display_h = 0;
@@ -67,7 +92,8 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
   }
 
   if (display_w < 100 || display_h < 100) {
-    if (g_original_swap_buffers != nullptr) { g_original_swap_buffers(window); }
+    restore_error_cb();
+    CallOriginalSwapBuffers(window);
     return;
   }
 
@@ -81,7 +107,8 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
   }
 
   if (window != g_ctx->pinned_window) {
-    if (g_original_swap_buffers != nullptr) { g_original_swap_buffers(window); }
+    restore_error_cb();
+    CallOriginalSwapBuffers(window);
     return;
   }
 
@@ -91,7 +118,8 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
   g_ctx->window_height = window_h;
 
   if (!EnsureImGuiInitialized(*g_ctx)) {
-    if (g_original_swap_buffers != nullptr) { g_original_swap_buffers(window); }
+    restore_error_cb();
+    CallOriginalSwapBuffers(window);
     return;
   }
 
@@ -184,11 +212,9 @@ void HkGlfwSwapBuffers(GLFWwindow* window) {
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, static_cast<GLuint>(last_pbo));
   glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(last_fbo));
 
-  if (g_ctx->glfw.set_error_callback && prev_error_callback) {
-    g_ctx->glfw.set_error_callback(prev_error_callback);
-  }
+  restore_error_cb();
 
-  if (g_original_swap_buffers != nullptr) { g_original_swap_buffers(window); }
+  CallOriginalSwapBuffers(window);
 }
 
 }  // namespace
@@ -211,15 +237,23 @@ std::expected<void, BootstrapError> InstallRenderHook(JavaVM* jvm) {
 
   static_assert(sizeof(GlfwSwapBuffersFn) == sizeof(lm_address_t));
 
-  const lm_size_t swap_hook_size =
-      LM_HookCode(reinterpret_cast<lm_address_t>(lookup.swap_buffers_address),
-                  reinterpret_cast<lm_address_t>(&HkGlfwSwapBuffers),
-                  reinterpret_cast<lm_address_t*>(&g_original_swap_buffers));
+  g_swap_buffers_target = reinterpret_cast<GlfwSwapBuffersFn>(lookup.swap_buffers_address);
 
-  if (swap_hook_size == 0 || g_original_swap_buffers == nullptr) {
-    g_ctx.reset();
-    return std::unexpected(BootstrapError::kSwapBuffersHookFailed);
-  }
+  std::memcpy(g_swap_original_bytes.data(),
+              reinterpret_cast<const void*>(g_swap_buffers_target),
+              kHookStubSize);
+
+  // Build a 14-byte absolute jump: FF 25 00 00 00 00 <8-byte addr>
+  g_swap_hook_bytes[0] = 0xFF;
+  g_swap_hook_bytes[1] = 0x25;
+  g_swap_hook_bytes[2] = 0x00;
+  g_swap_hook_bytes[3] = 0x00;
+  g_swap_hook_bytes[4] = 0x00;
+  g_swap_hook_bytes[5] = 0x00;
+  auto hook_addr = reinterpret_cast<std::uintptr_t>(&HkGlfwSwapBuffers);
+  std::memcpy(&g_swap_hook_bytes[6], &hook_addr, 8);
+
+  WriteBytesToTarget(g_swap_hook_bytes.data());
 
   return {};
 }

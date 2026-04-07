@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <tuple>
 
 #include "mc_internal/sdk/jni_cache.hpp"
@@ -74,6 +75,8 @@ class Entity {
   [[nodiscard]] static EntityData GetData(const JniEnv& env, const JniCache& cache, jobject entity);
   [[nodiscard]] static std::tuple<double, double, double>
   GetCoordinates(const JniEnv& env, const JniCache& cache, jobject entity);
+  [[nodiscard]] static std::string
+  GetTranslationKey(const JniEnv& env, const JniCache& cache, jobject entity);
 };
 
 }  // namespace mc_internal

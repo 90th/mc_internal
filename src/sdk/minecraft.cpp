@@ -385,6 +385,37 @@ Entity::GetCoordinates(const JniEnv& env, const JniCache& cache, jobject entity)
           CallEntityCoordinateMethod(env, entity, cache.entity_get_z, kEntityGetZMethod)};
 }
 
+std::string Entity::GetTranslationKey(const JniEnv& env, const JniCache& cache, jobject entity) {
+  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_get_type == nullptr ||
+      cache.entity_type_translation_key_field == nullptr) {
+    return {};
+  }
+
+  auto entity_type = CallObjectMethodReference(env,
+                                               entity,
+                                               cache.entity_get_type,
+                                               kEntityClass,
+                                               kEntityGetTypeMethod,
+                                               kEntityGetTypeSignature);
+  if (!entity_type) { return {}; }
+
+  auto jstr = GetObjectFieldReference(env,
+                                      entity_type.get(),
+                                      cache.entity_type_translation_key_field,
+                                      kEntityTypeClass,
+                                      kEntityTypeTranslationKeyField,
+                                      kEntityTypeTranslationKeyFieldSignature);
+  if (!jstr) { return {}; }
+
+  auto* raw_str = static_cast<jstring>(jstr.get());
+  const char* utf = env->GetStringUTFChars(raw_str, nullptr);
+  if (utf == nullptr) { return {}; }
+
+  std::string result(utf);
+  env->ReleaseStringUTFChars(raw_str, utf);
+  return result;
+}
+
 EntityData Entity::GetData(const JniEnv& env, const JniCache& cache, jobject entity) {
   EntityData data{};
   if (!env || !cache.is_initialized() || entity == nullptr) { return data; }

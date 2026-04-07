@@ -6,14 +6,10 @@ namespace mc_internal {
 
 struct OverlayContext;
 
-// Installs inline hooks on GLFW input functions so that gameplay input
-// (keyboard, mouse, cursor) is suppressed while the overlay menu is open.
-// Callback setter hooks intercept game-registered callbacks and wrap them
-// in filtering proxies; polling hooks return neutral values.
-//
-// After installation the overlay's own polling pointers in ctx.glfw are
-// redirected to the hook trampolines so the overlay always reads real
-// hardware state regardless of suppression.
+// Installs inline hooks on GLFW callback-setter functions so that gameplay
+// input (keyboard, mouse, cursor) is suppressed while the overlay menu is
+// open.  Each hooked setter intercepts game-registered callbacks and wraps
+// them in filtering proxies that drop events when the menu is visible.
 //
 // Returns true if at least one hook was installed successfully.
 bool InstallInputSuppression(OverlayContext& ctx);

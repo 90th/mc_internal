@@ -1,10 +1,15 @@
 #pragma once
 
 #include <array>
+#include <string_view>
+#include <unordered_set>
 
 #include "mc_internal/features/module.hpp"
+#include "mc_internal/ui/widgets.hpp"
 
 namespace mc_internal {
+
+inline constexpr int kHostileMobCount = 37;
 
 class EspModule : public Module {
  public:
@@ -14,6 +19,9 @@ class EspModule : public Module {
   void on_render_3d(const OverlayContext& ctx) override;
 
  private:
+  void RebuildHostileFilter();
+  bool AllHostilesVisible() const;
+
   struct TargetGroupState {
     bool enabled = false;
     std::array<float, 4> color = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -24,6 +32,10 @@ class EspModule : public Module {
   TargetGroupState hostile_group_ = {true, {0.98f, 0.36f, 0.22f, 1.0f}};
   TargetGroupState passive_group_ = {false, {0.24f, 0.78f, 0.42f, 1.0f}};
   TargetGroupState item_group_ = {false, {0.92f, 0.76f, 0.20f, 1.0f}};
+  std::array<bool, kHostileMobCount> hostile_mob_visible_{};
+  std::unordered_set<std::string_view> hidden_hostile_keys_;
+  bool hostile_filter_dirty_ = true;
+  ui::FilteredChecklistState hostile_checklist_state_{};
 };
 
 }  // namespace mc_internal

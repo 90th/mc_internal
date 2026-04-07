@@ -1,5 +1,7 @@
 #pragma once
 
+// Fabric intermediary names for Minecraft 1.21.11.
+
 #include <string_view>
 
 namespace mc_internal {
@@ -12,6 +14,7 @@ inline constexpr std::string_view kGameRendererClass = "net/minecraft/class_757"
 inline constexpr std::string_view kCameraClass = "net/minecraft/class_4184";
 inline constexpr std::string_view kVec3dClass = "net/minecraft/class_243";
 inline constexpr std::string_view kJomlMatrix4fClass = "org/joml/Matrix4f";
+inline constexpr std::string_view kEntityTypeClass = "net/minecraft/class_1299";
 inline constexpr std::string_view kHostileEntityClass = "net/minecraft/class_1588";
 inline constexpr std::string_view kPassiveEntityClass = "net/minecraft/class_1296";
 inline constexpr std::string_view kItemEntityClass = "net/minecraft/class_1542";
@@ -59,6 +62,11 @@ inline constexpr std::string_view kEntityGetLastRenderPosMethod = "method_61411"
 inline constexpr std::string_view kEntityGetLastRenderPosSignature = "()Lnet/minecraft/class_243;";
 inline constexpr std::string_view kEntityGetHeightMethod = "method_17682";
 inline constexpr std::string_view kEntityGetHeightSignature = "()F";
+inline constexpr std::string_view kEntityGetTypeMethod = "method_5864";
+inline constexpr std::string_view kEntityGetTypeSignature = "()Lnet/minecraft/class_1299;";
+
+inline constexpr std::string_view kEntityTypeTranslationKeyField = "field_6106";
+inline constexpr std::string_view kEntityTypeTranslationKeyFieldSignature = "Ljava/lang/String;";
 
 inline constexpr std::string_view kGameRendererGetCameraMethod = "method_19418";
 inline constexpr std::string_view kGameRendererGetCameraSignature = "()Lnet/minecraft/class_4184;";
