@@ -31,6 +31,7 @@ struct JniCache {
   jclass hostile_entity_class = nullptr;
   jclass passive_entity_class = nullptr;
   jclass item_entity_class = nullptr;
+  jclass living_entity_class = nullptr;
 
   jmethodID minecraft_client_get_instance = nullptr;
   jfieldID minecraft_client_player_field = nullptr;
@@ -47,7 +48,15 @@ struct JniCache {
   jmethodID entity_get_height = nullptr;
   jmethodID entity_get_width = nullptr;
   jmethodID entity_get_type = nullptr;
+  jmethodID entity_get_name = nullptr;
+  jmethodID entity_get_id = nullptr;
   jfieldID entity_type_translation_key_field = nullptr;
+  jmethodID living_entity_get_health = nullptr;
+  jmethodID living_entity_get_max_health = nullptr;
+  jmethodID living_entity_get_absorption_amount = nullptr;
+  jmethodID player_entity_get_game_profile = nullptr;
+  jmethodID game_profile_get_name = nullptr;
+  jmethodID text_get_string = nullptr;
   jmethodID game_renderer_get_camera = nullptr;
   jmethodID game_renderer_get_fov = nullptr;
   jmethodID camera_get_pitch = nullptr;

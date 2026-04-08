@@ -1,5 +1,6 @@
 #include "mc_internal/sdk/minecraft.hpp"
 
+#include <algorithm>
 #include <print>
 
 #include "mc_internal/utils/logging.hpp"
@@ -419,6 +420,76 @@ bool Entity::IsTranslationKeyInSet(const JniEnv& env,
   return found;
 }
 
+std::string Entity::GetName(const JniEnv& env, const JniCache& cache, jobject entity) {
+  if (!env || !cache.is_initialized() || entity == nullptr) { return {}; }
+
+  if (cache.player_entity_get_game_profile != nullptr && cache.game_profile_get_name != nullptr &&
+      env->IsInstanceOf(entity, cache.client_player_entity_class)) {
+    auto profile = CallObjectMethodReference(env,
+                                             entity,
+                                             cache.player_entity_get_game_profile,
+                                             kPlayerEntityClass,
+                                             kPlayerEntityGetGameProfileMethod,
+                                             kPlayerEntityGetGameProfileSignature);
+    if (profile) {
+      auto jstr = CallObjectMethodReference(env,
+                                            profile.get(),
+                                            cache.game_profile_get_name,
+                                            kGameProfileClass,
+                                            kGameProfileGetNameMethod,
+                                            kGameProfileGetNameSignature);
+      if (jstr) {
+        auto* raw_str = static_cast<jstring>(jstr.get());
+        const char* utf = env->GetStringUTFChars(raw_str, nullptr);
+        if (utf != nullptr) {
+          std::string result(utf);
+          env->ReleaseStringUTFChars(raw_str, utf);
+          if (!result.empty()) { return result; }
+        }
+      }
+    }
+  }
+
+  if (cache.entity_get_name != nullptr && cache.text_get_string != nullptr) {
+    auto text_obj = CallObjectMethodReference(env,
+                                              entity,
+                                              cache.entity_get_name,
+                                              kEntityClass,
+                                              kEntityGetNameMethod,
+                                              kEntityGetNameSignature);
+    if (text_obj) {
+      auto jstr = CallObjectMethodReference(env,
+                                            text_obj.get(),
+                                            cache.text_get_string,
+                                            kTextClass,
+                                            kTextGetStringMethod,
+                                            kTextGetStringSignature);
+      if (jstr) {
+        auto* raw_str = static_cast<jstring>(jstr.get());
+        const char* utf = env->GetStringUTFChars(raw_str, nullptr);
+        if (utf != nullptr) {
+          std::string result(utf);
+          env->ReleaseStringUTFChars(raw_str, utf);
+          if (!result.empty()) { return result; }
+        }
+      }
+    }
+  }
+
+  std::string key = GetTranslationKey(env, cache, entity);
+  if (key.empty()) { return {}; }
+  if (auto pos = key.rfind('.'); pos != std::string::npos) { key = key.substr(pos + 1); }
+  std::replace(key.begin(), key.end(), '_', ' ');
+  return key;
+}
+
+int Entity::GetId(const JniEnv& env, const JniCache& cache, jobject entity) {
+  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_get_id == nullptr) {
+    return 0;
+  }
+  return static_cast<int>(env->CallIntMethod(entity, cache.entity_get_id));
+}
+
 EntityData Entity::GetData(const JniEnv& env, const JniCache& cache, jobject entity) {
   EntityData data{};
   if (!env || !cache.is_initialized() || entity == nullptr) { return data; }
@@ -449,6 +520,33 @@ EntityData Entity::GetData(const JniEnv& env, const JniCache& cache, jobject ent
                                kEntityGetWidthMethod,
                                kEntityGetWidthSignature);
   return data;
+}
+
+float LivingEntity::GetHealth(const JniEnv& env, const JniCache& cache, jobject entity) {
+  return CallFloatMethod(env,
+                         entity,
+                         cache.living_entity_get_health,
+                         kLivingEntityClass,
+                         kLivingEntityGetHealthMethod,
+                         kLivingEntityGetHealthSignature);
+}
+
+float LivingEntity::GetMaxHealth(const JniEnv& env, const JniCache& cache, jobject entity) {
+  return CallFloatMethod(env,
+                         entity,
+                         cache.living_entity_get_max_health,
+                         kLivingEntityClass,
+                         kLivingEntityGetMaxHealthMethod,
+                         kLivingEntityGetMaxHealthSignature);
+}
+
+float LivingEntity::GetAbsorptionAmount(const JniEnv& env, const JniCache& cache, jobject entity) {
+  return CallFloatMethod(env,
+                         entity,
+                         cache.living_entity_get_absorption_amount,
+                         kLivingEntityClass,
+                         kLivingEntityGetAbsorptionAmountMethod,
+                         kLivingEntityGetAbsorptionAmountSignature);
 }
 
 }  // namespace mc_internal

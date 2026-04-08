@@ -12,6 +12,7 @@
 #include "mc_internal/core/jvm_attachment.hpp"
 #include "mc_internal/sdk/math.hpp"
 #include "mc_internal/sdk/minecraft.hpp"
+#include "mc_internal/ui/anim.hpp"
 #include "mc_internal/ui/widgets.hpp"
 
 namespace mc_internal {
@@ -297,6 +298,8 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
   ImGui::PopItemWidth();
 
   ui::Toggle("show distance", &show_distance_);
+  ui::Toggle("show nametags", &show_nametags_);
+  ui::Toggle("show health bars", &show_health_bars_);
 
   ui::SectionHeader("render distance");
 
@@ -362,7 +365,7 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
 
   for (auto entity : ClientWorld::GetEntities(env, ctx.jni_cache, world.get())) {
     if (!entity) { continue; }
-    JniLocalFrame frame(env.get(), 16);
+    JniLocalFrame frame(env.get(), 24);
     if (!frame) { continue; }
 
     if (local_player && env->IsSameObject(entity.get(), local_player.get()) == JNI_TRUE) {
@@ -424,26 +427,32 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
 
     float smin_x = 1e30f, smin_y = 1e30f;
     float smax_x = -1e30f, smax_y = -1e30f;
-    bool valid = true;
+    int valid_count = 0;
 
     for (int i = 0; i < 8; ++i) {
       Vec2 sp;
-      if (!WorldToScreen(corners[i],
-                         view_matrix.data(),
-                         projection_matrix.data(),
-                         ctx.display_width,
-                         ctx.display_height,
-                         sp)) {
-        valid = false;
-        break;
+      if (!WorldToScreenRelaxed(corners[i],
+                                view_matrix.data(),
+                                projection_matrix.data(),
+                                ctx.display_width,
+                                ctx.display_height,
+                                sp)) {
+        continue;
       }
+      ++valid_count;
       smin_x = std::min(smin_x, sp.x);
       smin_y = std::min(smin_y, sp.y);
       smax_x = std::max(smax_x, sp.x);
       smax_y = std::max(smax_y, sp.y);
     }
 
-    if (!valid) { continue; }
+    if (valid_count == 0) { continue; }
+
+    const float sw = static_cast<float>(ctx.display_width);
+    const float sh = static_cast<float>(ctx.display_height);
+    if (smax_x < 0.0f || smin_x > sw || smax_y < 0.0f || smin_y > sh) { continue; }
+
+    if (smax_x - smin_x < 1.0f || smax_y - smin_y < 1.0f) { continue; }
 
     const float proj_w = smax_x - smin_x;
     const float proj_h = smax_y - smin_y;
@@ -482,6 +491,71 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
     } else {
       draw_list->AddRect(box_min, box_max, shadow_color, 0.0f, 0, line_thickness_ + 2.0f);
       draw_list->AddRect(box_min, box_max, im_color, 0.0f, 0, line_thickness_);
+    }
+
+    float above_y = smin_y;
+
+    if (show_health_bars_ && env->IsInstanceOf(entity.get(), ctx.jni_cache.living_entity_class)) {
+      const float health = LivingEntity::GetHealth(env, ctx.jni_cache, entity.get());
+      const float max_health = LivingEntity::GetMaxHealth(env, ctx.jni_cache, entity.get());
+
+      if (max_health > 0.0f) {
+        constexpr float kBarHeight = 2.0f;
+        const float bar_width = smax_x - smin_x;
+        const float bar_y = above_y - kBarHeight - 2.0f;
+        const float health_ratio = std::clamp(health / max_health, 0.0f, 1.0f);
+        const int eid = Entity::GetId(env, ctx.jni_cache, entity.get());
+
+        draw_list->AddRectFilled(ImVec2(smin_x, bar_y),
+                                 ImVec2(smax_x, bar_y + kBarHeight),
+                                 IM_COL32(0, 0, 0, static_cast<int>(80.0f * alpha_mult)));
+
+        const ImGuiID trail_id = static_cast<ImGuiID>(eid) ^ 0xDA47u;
+        float trail_ratio = ui::Anim::Lerp(trail_id, health_ratio, 3.0f);
+        trail_ratio = std::max(trail_ratio, health_ratio);
+        if (trail_ratio > health_ratio + 0.001f) {
+          draw_list->AddRectFilled(ImVec2(smin_x + bar_width * health_ratio, bar_y),
+                                   ImVec2(smin_x + bar_width * trail_ratio, bar_y + kBarHeight),
+                                   IM_COL32(140, 140, 140, static_cast<int>(160.0f * alpha_mult)));
+        }
+
+        if (health_ratio > 0.0f) {
+          const float hr = std::clamp((1.0f - health_ratio) * 2.0f, 0.0f, 1.0f);
+          const float hg = std::clamp(health_ratio * 2.0f, 0.0f, 1.0f);
+          draw_list->AddRectFilled(ImVec2(smin_x, bar_y),
+                                   ImVec2(smin_x + bar_width * health_ratio, bar_y + kBarHeight),
+                                   IM_COL32(static_cast<int>(hr * 255),
+                                            static_cast<int>(hg * 255),
+                                            0,
+                                            static_cast<int>(220.0f * alpha_mult)));
+        }
+
+        const float absorption =
+            LivingEntity::GetAbsorptionAmount(env, ctx.jni_cache, entity.get());
+        if (absorption > 0.0f) {
+          const float abs_ratio = std::clamp(absorption / max_health, 0.0f, 1.0f - health_ratio);
+          if (abs_ratio > 0.001f) {
+            draw_list->AddRectFilled(
+                ImVec2(smin_x + bar_width * health_ratio, bar_y),
+                ImVec2(smin_x + bar_width * (health_ratio + abs_ratio), bar_y + kBarHeight),
+                IM_COL32(255, 200, 40, static_cast<int>(200.0f * alpha_mult)));
+          }
+        }
+
+        above_y = bar_y;
+      }
+    }
+
+    if (show_nametags_) {
+      const std::string name = Entity::GetName(env, ctx.jni_cache, entity.get());
+      if (!name.empty()) {
+        const ImVec2 name_size = ImGui::CalcTextSize(name.c_str());
+        const float name_x = (smin_x + smax_x) * 0.5f - name_size.x * 0.5f;
+        const float name_y = above_y - name_size.y - 2.0f;
+        const ImU32 name_color = IM_COL32(255, 255, 255, static_cast<int>(255.0f * alpha_mult));
+        draw_list->AddText(ImVec2(name_x + 1.0f, name_y + 1.0f), shadow_color, name.c_str());
+        draw_list->AddText(ImVec2(name_x, name_y), name_color, name.c_str());
+      }
     }
 
     if (show_distance_) {

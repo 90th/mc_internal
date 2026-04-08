@@ -20,4 +20,11 @@ struct Vec3 {
                                  int screen_height,
                                  Vec2& out_screen_pos);
 
+[[nodiscard]] bool WorldToScreenRelaxed(const Vec3& world_pos,
+                                        const float* view_matrix,
+                                        const float* proj_matrix,
+                                        int screen_width,
+                                        int screen_height,
+                                        Vec2& out_screen_pos);
+
 }  // namespace mc_internal

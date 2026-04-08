@@ -50,13 +50,15 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
   hostile_entity_class = CacheGlobalClass(env, kHostileEntityClass);
   passive_entity_class = CacheGlobalClass(env, kPassiveEntityClass);
   item_entity_class = CacheGlobalClass(env, kItemEntityClass);
+  living_entity_class = CacheGlobalClass(env, kLivingEntityClass);
 
   if (minecraft_client_class == nullptr || client_player_entity_class == nullptr ||
       client_world_class == nullptr || entity_class == nullptr || game_renderer_class == nullptr ||
       camera_class == nullptr || vec3d_class == nullptr || render_tick_counter_class == nullptr ||
       joml_matrix4f_class == nullptr || java_lang_iterable_class == nullptr ||
       java_util_iterator_class == nullptr || hostile_entity_class == nullptr ||
-      passive_entity_class == nullptr || item_entity_class == nullptr) {
+      passive_entity_class == nullptr || item_entity_class == nullptr ||
+      living_entity_class == nullptr) {
     Reset(env.get());
     PrintStatus("jni cache initialization failed: missing class handles");
     return false;
@@ -138,6 +140,23 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
       env.GetMethodID(entity_class, kEntityGetWidthMethod, kEntityGetWidthSignature, kEntityClass);
   entity_get_type =
       env.GetMethodID(entity_class, kEntityGetTypeMethod, kEntityGetTypeSignature, kEntityClass);
+  entity_get_name =
+      env.GetMethodID(entity_class, kEntityGetNameMethod, kEntityGetNameSignature, kEntityClass);
+  entity_get_id =
+      env.GetMethodID(entity_class, kEntityGetIdMethod, kEntityGetIdSignature, kEntityClass);
+
+  living_entity_get_health = env.GetMethodID(living_entity_class,
+                                             kLivingEntityGetHealthMethod,
+                                             kLivingEntityGetHealthSignature,
+                                             kLivingEntityClass);
+  living_entity_get_max_health = env.GetMethodID(living_entity_class,
+                                                 kLivingEntityGetMaxHealthMethod,
+                                                 kLivingEntityGetMaxHealthSignature,
+                                                 kLivingEntityClass);
+  living_entity_get_absorption_amount = env.GetMethodID(living_entity_class,
+                                                        kLivingEntityGetAbsorptionAmountMethod,
+                                                        kLivingEntityGetAbsorptionAmountSignature,
+                                                        kLivingEntityClass);
 
   {
     auto entity_type_class = CacheGlobalClass(env, kEntityTypeClass);
@@ -147,6 +166,30 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
                                                          kEntityTypeTranslationKeyFieldSignature,
                                                          kEntityTypeClass);
       env->DeleteGlobalRef(entity_type_class);
+    }
+  }
+
+  {
+    auto text_class = CacheGlobalClass(env, kTextClass);
+    if (text_class != nullptr) {
+      text_get_string =
+          env.GetMethodID(text_class, kTextGetStringMethod, kTextGetStringSignature, kTextClass);
+      env->DeleteGlobalRef(text_class);
+    }
+  }
+
+  player_entity_get_game_profile = env.GetMethodID(client_player_entity_class,
+                                                   kPlayerEntityGetGameProfileMethod,
+                                                   kPlayerEntityGetGameProfileSignature,
+                                                   kClientPlayerEntityClass);
+  if (player_entity_get_game_profile != nullptr) {
+    auto game_profile_class = CacheGlobalClass(env, kGameProfileClass);
+    if (game_profile_class != nullptr) {
+      game_profile_get_name = env.GetMethodID(game_profile_class,
+                                              kGameProfileGetNameMethod,
+                                              kGameProfileGetNameSignature,
+                                              kGameProfileClass);
+      env->DeleteGlobalRef(game_profile_class);
     }
   }
 
@@ -160,7 +203,9 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
       render_tick_counter_get_tick_progress == nullptr || vec3d_x_field == nullptr ||
       vec3d_y_field == nullptr || vec3d_z_field == nullptr || entity_get_x == nullptr ||
       entity_get_y == nullptr || entity_get_z == nullptr || iterable_iterator == nullptr ||
-      iterator_has_next == nullptr || iterator_next == nullptr || entity_get_type == nullptr) {
+      iterator_has_next == nullptr || iterator_next == nullptr || entity_get_type == nullptr ||
+      living_entity_get_health == nullptr || living_entity_get_max_health == nullptr ||
+      living_entity_get_absorption_amount == nullptr) {
     Reset(env.get());
     PrintStatus("jni cache initialization failed: missing member handles");
     return false;
@@ -204,6 +249,9 @@ void JniCache::Reset(JNIEnv* env) noexcept {
     env->DeleteGlobalRef(passive_entity_class);
   }
   if (env != nullptr && item_entity_class != nullptr) { env->DeleteGlobalRef(item_entity_class); }
+  if (env != nullptr && living_entity_class != nullptr) {
+    env->DeleteGlobalRef(living_entity_class);
+  }
 
   minecraft_client_class = nullptr;
   client_player_entity_class = nullptr;
@@ -219,6 +267,7 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   hostile_entity_class = nullptr;
   passive_entity_class = nullptr;
   item_entity_class = nullptr;
+  living_entity_class = nullptr;
 
   minecraft_client_get_instance = nullptr;
   minecraft_client_player_field = nullptr;
@@ -234,7 +283,15 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   entity_get_height = nullptr;
   entity_get_width = nullptr;
   entity_get_type = nullptr;
+  entity_get_name = nullptr;
   entity_type_translation_key_field = nullptr;
+  living_entity_get_health = nullptr;
+  living_entity_get_max_health = nullptr;
+  living_entity_get_absorption_amount = nullptr;
+  entity_get_id = nullptr;
+  player_entity_get_game_profile = nullptr;
+  game_profile_get_name = nullptr;
+  text_get_string = nullptr;
   game_renderer_get_camera = nullptr;
   game_renderer_get_fov = nullptr;
   camera_get_pitch = nullptr;

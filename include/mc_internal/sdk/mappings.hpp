@@ -15,9 +15,11 @@ inline constexpr std::string_view kCameraClass = "net/minecraft/class_4184";
 inline constexpr std::string_view kVec3dClass = "net/minecraft/class_243";
 inline constexpr std::string_view kJomlMatrix4fClass = "org/joml/Matrix4f";
 inline constexpr std::string_view kEntityTypeClass = "net/minecraft/class_1299";
+inline constexpr std::string_view kLivingEntityClass = "net/minecraft/class_1309";
 inline constexpr std::string_view kHostileEntityClass = "net/minecraft/class_1588";
 inline constexpr std::string_view kPassiveEntityClass = "net/minecraft/class_1296";
 inline constexpr std::string_view kItemEntityClass = "net/minecraft/class_1542";
+inline constexpr std::string_view kTextClass = "net/minecraft/class_2561";
 
 inline constexpr std::string_view kJavaLangIterableClass = "java/lang/Iterable";
 inline constexpr std::string_view kJavaUtilIteratorClass = "java/util/Iterator";
@@ -66,6 +68,29 @@ inline constexpr std::string_view kEntityGetWidthMethod = "method_17681";
 inline constexpr std::string_view kEntityGetWidthSignature = "()F";
 inline constexpr std::string_view kEntityGetTypeMethod = "method_5864";
 inline constexpr std::string_view kEntityGetTypeSignature = "()Lnet/minecraft/class_1299;";
+inline constexpr std::string_view kEntityGetNameMethod = "method_5477";
+inline constexpr std::string_view kEntityGetNameSignature = "()Lnet/minecraft/class_2561;";
+inline constexpr std::string_view kEntityGetIdMethod = "method_5628";
+inline constexpr std::string_view kEntityGetIdSignature = "()I";
+
+inline constexpr std::string_view kPlayerEntityClass = "net/minecraft/class_1657";
+inline constexpr std::string_view kPlayerEntityGetGameProfileMethod = "method_7334";
+inline constexpr std::string_view kPlayerEntityGetGameProfileSignature =
+    "()Lcom/mojang/authlib/GameProfile;";
+
+inline constexpr std::string_view kGameProfileClass = "com/mojang/authlib/GameProfile";
+inline constexpr std::string_view kGameProfileGetNameMethod = "getName";
+inline constexpr std::string_view kGameProfileGetNameSignature = "()Ljava/lang/String;";
+
+inline constexpr std::string_view kLivingEntityGetHealthMethod = "method_6032";
+inline constexpr std::string_view kLivingEntityGetHealthSignature = "()F";
+inline constexpr std::string_view kLivingEntityGetMaxHealthMethod = "method_6063";
+inline constexpr std::string_view kLivingEntityGetMaxHealthSignature = "()F";
+inline constexpr std::string_view kLivingEntityGetAbsorptionAmountMethod = "method_6067";
+inline constexpr std::string_view kLivingEntityGetAbsorptionAmountSignature = "()F";
+
+inline constexpr std::string_view kTextGetStringMethod = "method_10851";
+inline constexpr std::string_view kTextGetStringSignature = "()Ljava/lang/String;";
 
 inline constexpr std::string_view kEntityTypeTranslationKeyField = "field_6106";
 inline constexpr std::string_view kEntityTypeTranslationKeyFieldSignature = "Ljava/lang/String;";

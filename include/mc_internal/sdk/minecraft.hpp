@@ -85,6 +85,17 @@ class Entity {
                                                   const JniCache& cache,
                                                   jobject entity,
                                                   const std::unordered_set<std::string_view>& keys);
+  [[nodiscard]] static std::string
+  GetName(const JniEnv& env, const JniCache& cache, jobject entity);
+  [[nodiscard]] static int GetId(const JniEnv& env, const JniCache& cache, jobject entity);
+};
+
+class LivingEntity {
+ public:
+  [[nodiscard]] static float GetHealth(const JniEnv& env, const JniCache& cache, jobject entity);
+  [[nodiscard]] static float GetMaxHealth(const JniEnv& env, const JniCache& cache, jobject entity);
+  [[nodiscard]] static float
+  GetAbsorptionAmount(const JniEnv& env, const JniCache& cache, jobject entity);
 };
 
 }  // namespace mc_internal
