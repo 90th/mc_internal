@@ -15,6 +15,14 @@ bool Toggle(const char* label, bool* v);
 // Section label with dimmed text and a thin rule underneath.
 void SectionHeader(const char* label);
 
+// Slider with a left-aligned label and right-aligned track.
+bool LabeledSlider(const char* label,
+                   const char* slider_id,
+                   float* v,
+                   float v_min,
+                   float v_max,
+                   const char* format = "%.2f");
+
 // Small descriptive text, rendered at reduced opacity.
 void DescriptionText(const char* text);
 
@@ -40,5 +48,18 @@ bool FilteredChecklist(const char* id,
                        bool* values,
                        int count,
                        float preview_width = 100.0f);
+
+// Fixed-column target-group row: checkbox+label, style combo at combo_x
+// (when enabled), color picker at color_x. Takes color_flags as int to
+// avoid pulling in ImGui flag types.
+void TargetGroupRow(const char* label,
+                    const char* style_id,
+                    const char* color_id,
+                    bool* enabled,
+                    float* color,
+                    int* style,
+                    float combo_x,
+                    float color_x,
+                    int color_flags);
 
 }  // namespace mc_internal::ui

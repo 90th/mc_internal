@@ -29,7 +29,6 @@ class EspModule : public Module {
   };
 
   float max_render_distance_ = 256.0f;
-  float line_thickness_ = 1.5f;
   bool show_distance_ = true;
   bool show_nametags_ = true;
   bool show_health_bars_ = true;

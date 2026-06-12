@@ -186,6 +186,22 @@ void SectionHeader(const char* label) {
   ImGui::Dummy(ImVec2(0.0f, label_size.y + 8.0f));
 }
 
+// ── LabeledSlider ────────────────────────────────────────────────────────
+bool LabeledSlider(const char* label,
+                   const char* slider_id,
+                   float* v,
+                   float v_min,
+                   float v_max,
+                   const char* format) {
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextDisabled("%s", label);
+  ImGui::SameLine(0.0f, 8.0f);
+  ImGui::PushItemWidth(-1.0f);
+  bool changed = SliderFloat(slider_id, v, v_min, v_max, format);
+  ImGui::PopItemWidth();
+  return changed;
+}
+
 // ── DescriptionText ──────────────────────────────────────────────────────────
 void DescriptionText(const char* text) {
   ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
@@ -303,6 +319,29 @@ bool FilteredChecklist(const char* id,
   }
 
   return changed;
+}
+
+// ── TargetGroupRow ──────────────────────────────────────────────────────────
+void TargetGroupRow(const char* label,
+                    const char* style_id,
+                    const char* color_id,
+                    bool* enabled,
+                    float* color,
+                    int* style,
+                    float combo_x,
+                    float color_x,
+                    int color_flags) {
+  ImGui::Checkbox(label, enabled);
+  if (*enabled) {
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(combo_x);
+    ImGui::PushItemWidth(72.0f);
+    ImGui::Combo(style_id, style, "corner\0box\0");
+    ImGui::PopItemWidth();
+  }
+  ImGui::SameLine();
+  ImGui::SetCursorPosX(color_x);
+  ImGui::ColorEdit4(color_id, color, color_flags);
 }
 
 }  // namespace mc_internal::ui

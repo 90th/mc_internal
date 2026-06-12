@@ -185,29 +185,6 @@ void DrawCornerEsp(ImDrawList* dl,
   draw(color, thickness);
 }
 
-void RenderTargetGroupRow(const char* label,
-                          const char* color_id,
-                          const char* style_id,
-                          bool* enabled,
-                          std::array<float, 4>* color,
-                          int* style) {
-  const float color_button_size = ImGui::GetFrameHeight();
-
-  ImGui::Checkbox(label, enabled);
-  if (*enabled) {
-    ImGui::SameLine();
-    ImGui::PushItemWidth(72.0f);
-    ImGui::Combo(style_id, style, "corner\0box\0");
-    ImGui::PopItemWidth();
-  }
-
-  ImGui::SameLine();
-  const float current_x = ImGui::GetCursorPosX();
-  const float color_x = current_x + ImGui::GetContentRegionAvail().x - color_button_size;
-  ImGui::SetCursorPosX(std::max(current_x, color_x));
-  ImGui::ColorEdit4(color_id, color->data(), kGroupColorEditFlags);
-}
-
 }  // namespace
 
 EspModule::EspModule()
@@ -235,83 +212,94 @@ bool EspModule::AllHostilesVisible() const {
 void EspModule::on_render_settings(const OverlayContext& ctx) {
   static_cast<void>(ctx);
 
-  ui::SectionHeader("target groups");
+  constexpr float kFilterIndent = 24.0f;
 
-  RenderTargetGroupRow("players",
-                       "##esp_players_color",
-                       "##esp_players_style",
-                       &player_group_.enabled,
-                       &player_group_.color,
-                       &player_group_.style);
-  {
-    const float color_button_size = ImGui::GetFrameHeight();
-    ImGui::Checkbox("hostiles", &hostile_group_.enabled);
-    if (hostile_group_.enabled) {
-      ImGui::SameLine();
+  ui::SectionHeader("targets");
 
-      static const char* hostile_labels[kHostileMobCount];
-      static bool labels_init = false;
-      if (!labels_init) {
-        for (int i = 0; i < kHostileMobCount; ++i) {
-          hostile_labels[i] = kHostileMobs[i].display_label;
-        }
-        labels_init = true;
+  const float region_x = ImGui::GetCursorPosX();
+  const float avail = ImGui::GetContentRegionAvail().x;
+  const float combo_x = region_x + 90.0f;
+  const float color_x = region_x + avail - ImGui::GetFrameHeight();
+
+  ui::TargetGroupRow("players",
+                     "##esp_players_style",
+                     "##esp_players_color",
+                     &player_group_.enabled,
+                     player_group_.color.data(),
+                     &player_group_.style,
+                     combo_x,
+                     color_x,
+                     kGroupColorEditFlags);
+
+  ui::TargetGroupRow("hostiles",
+                     "##esp_hostile_style",
+                     "##esp_hostiles_color",
+                     &hostile_group_.enabled,
+                     hostile_group_.color.data(),
+                     &hostile_group_.style,
+                     combo_x,
+                     color_x,
+                     kGroupColorEditFlags);
+
+  if (hostile_group_.enabled) {
+    static const char* hostile_labels[kHostileMobCount];
+    static bool labels_init = false;
+    if (!labels_init) {
+      for (int i = 0; i < kHostileMobCount; ++i) {
+        hostile_labels[i] = kHostileMobs[i].display_label;
       }
-
-      if (ui::FilteredChecklist("##esp_hostile_filter",
-                                hostile_checklist_state_,
-                                hostile_labels,
-                                hostile_mob_visible_.data(),
-                                kHostileMobCount,
-                                90.0f)) {
-        hostile_filter_dirty_ = true;
-      }
-
-      ImGui::SameLine();
-      ImGui::PushItemWidth(72.0f);
-      ImGui::Combo("##esp_hostile_style", &hostile_group_.style, "corner\0box\0");
-      ImGui::PopItemWidth();
+      labels_init = true;
     }
+
+    ImGui::Indent(kFilterIndent);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("filter");
     ImGui::SameLine();
-    const float current_x = ImGui::GetCursorPosX();
-    const float color_x = current_x + ImGui::GetContentRegionAvail().x - color_button_size;
-    ImGui::SetCursorPosX(std::max(current_x, color_x));
-    ImGui::ColorEdit4("##esp_hostiles_color", hostile_group_.color.data(), kGroupColorEditFlags);
+    if (ui::FilteredChecklist("##esp_hostile_filter",
+                              hostile_checklist_state_,
+                              hostile_labels,
+                              hostile_mob_visible_.data(),
+                              kHostileMobCount,
+                              90.0f)) {
+      hostile_filter_dirty_ = true;
+    }
+    ImGui::Unindent(kFilterIndent);
   }
-  RenderTargetGroupRow("passives",
-                       "##esp_passives_color",
-                       "##esp_passives_style",
-                       &passive_group_.enabled,
-                       &passive_group_.color,
-                       &passive_group_.style);
-  RenderTargetGroupRow("items",
-                       "##esp_items_color",
-                       "##esp_items_style",
-                       &item_group_.enabled,
-                       &item_group_.color,
-                       &item_group_.style);
+
+  ui::TargetGroupRow("passives",
+                     "##esp_passives_style",
+                     "##esp_passives_color",
+                     &passive_group_.enabled,
+                     passive_group_.color.data(),
+                     &passive_group_.style,
+                     combo_x,
+                     color_x,
+                     kGroupColorEditFlags);
+
+  ui::TargetGroupRow("items",
+                     "##esp_items_style",
+                     "##esp_items_color",
+                     &item_group_.enabled,
+                     item_group_.color.data(),
+                     &item_group_.style,
+                     combo_x,
+                     color_x,
+                     kGroupColorEditFlags);
 
   ui::SectionHeader("appearance");
 
-  ImGui::PushItemWidth(-1.0f);
-  ui::SliderFloat("##esp_line_thickness", &line_thickness_, 0.5f, 4.0f, "%.1f px");
-  ImGui::PopItemWidth();
+  ui::LabeledSlider("render distance",
+                    "##esp_max_render_distance",
+                    &max_render_distance_,
+                    kMinRenderDistance,
+                    kMaxRenderDistance,
+                    "%.0f blocks");
+
+  ImGui::Spacing();
 
   ui::Toggle("show distance", &show_distance_);
   ui::Toggle("show nametags", &show_nametags_);
   ui::Toggle("show health bars", &show_health_bars_);
-
-  ui::SectionHeader("render distance");
-
-  ImGui::PushItemWidth(-1.0f);
-  ui::SliderFloat("##esp_max_render_distance",
-                  &max_render_distance_,
-                  kMinRenderDistance,
-                  kMaxRenderDistance,
-                  "%.0f blocks");
-  ImGui::PopItemWidth();
-
-  ImGui::Spacing();
 }
 
 void EspModule::on_render_3d(const OverlayContext& ctx) {
@@ -487,10 +475,10 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
     const ImVec2 box_max(smax_x, smax_y);
 
     if (group->style == kEspStyleCorner) {
-      DrawCornerEsp(draw_list, box_min, box_max, im_color, shadow_color, line_thickness_);
+      DrawCornerEsp(draw_list, box_min, box_max, im_color, shadow_color, 1.5f);
     } else {
-      draw_list->AddRect(box_min, box_max, shadow_color, 0.0f, 0, line_thickness_ + 2.0f);
-      draw_list->AddRect(box_min, box_max, im_color, 0.0f, 0, line_thickness_);
+      draw_list->AddRect(box_min, box_max, shadow_color, 0.0f, 0, 3.5f);
+      draw_list->AddRect(box_min, box_max, im_color, 0.0f, 0, 1.5f);
     }
 
     float above_y = smin_y;

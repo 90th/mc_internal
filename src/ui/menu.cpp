@@ -142,10 +142,8 @@ void RenderMenu(GLFWwindow* window, const OverlayContext& ctx) {
     dl->AddText(title_pos, kTitleColor, "mc internal");
 
     const float sep_y = title_pos.y + ImGui::GetTextLineHeight() + 8.0f;
-    dl->AddLine(ImVec2(sidebar_min.x + 10.0f, sep_y),
-                ImVec2(sidebar_max.x - 10.0f, sep_y),
-                kSeparator,
-                1.0f);
+    dl->AddLine(
+        ImVec2(sidebar_min.x + 6.0f, sep_y), ImVec2(sidebar_max.x - 6.0f, sep_y), kSeparator, 1.0f);
 
     constexpr std::array<ModuleCategory, 4> kCategories = {ModuleCategory::kCombat,
                                                            ModuleCategory::kVisuals,
@@ -223,8 +221,8 @@ void RenderMenu(GLFWwindow* window, const OverlayContext& ctx) {
   }
 
   // ── vertical separator between sidebar and content ─────────────────────
-  dl->AddLine(ImVec2(win_pos.x + kSidebarWidth, win_pos.y + 8.0f),
-              ImVec2(win_pos.x + kSidebarWidth, win_pos.y + win_size.y - 8.0f),
+  dl->AddLine(ImVec2(win_pos.x + kSidebarWidth, win_pos.y),
+              ImVec2(win_pos.x + kSidebarWidth, win_pos.y + win_size.y),
               kSeparator,
               1.0f);
 
