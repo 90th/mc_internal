@@ -166,24 +166,39 @@ bool Toggle(const char* label, bool* v) {
   return pressed;
 }
 
+// ── HelpMarker ───────────────────────────────────────────────────────────────
+void HelpMarker(const char* text) {
+  ImGui::TextDisabled("(?)");
+  if (!ImGui::IsItemHovered()) { return; }
+
+  ImGui::BeginTooltip();
+  ImGui::PushTextWrapPos(ImGui::GetFontSize() * 26.0f);
+  ImGui::TextUnformatted(text);
+  ImGui::PopTextWrapPos();
+  ImGui::EndTooltip();
+}
+
 // ── SectionHeader ────────────────────────────────────────────────────────────
-void SectionHeader(const char* label) {
+void SectionHeader(const char* label, const char* tooltip) {
   ImGuiWindow* window = ImGui::GetCurrentWindow();
   if (window->SkipItems) { return; }
 
   ImGui::Spacing();
 
   const ImVec2 pos = window->DC.CursorPos;
-  const ImVec2 label_size = ImGui::CalcTextSize(label, nullptr, true);
-  const float avail_width = ImGui::GetContentRegionAvail().x;
+  ImGui::TextDisabled("%s", label);
+  if (tooltip != nullptr && tooltip[0] != '\0') {
+    ImGui::SameLine(0.0f, 4.0f);
+    HelpMarker(tooltip);
+  }
 
-  window->DrawList->AddText(pos, kTextDim, label);
+  const float line_y = ImGui::GetCursorScreenPos().y + 3.0f;
+  window->DrawList->AddLine(ImVec2(pos.x, line_y),
+                            ImVec2(pos.x + ImGui::GetContentRegionAvail().x, line_y),
+                            IM_COL32(50, 50, 55, 255),
+                            1.0f);
 
-  const float line_y = pos.y + label_size.y + 3.0f;
-  window->DrawList->AddLine(
-      ImVec2(pos.x, line_y), ImVec2(pos.x + avail_width, line_y), IM_COL32(50, 50, 55, 255), 1.0f);
-
-  ImGui::Dummy(ImVec2(0.0f, label_size.y + 8.0f));
+  ImGui::Dummy(ImVec2(0.0f, 7.0f));
 }
 
 // ── LabeledSlider ────────────────────────────────────────────────────────

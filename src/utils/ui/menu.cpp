@@ -66,6 +66,11 @@ void RenderModuleCard(const std::unique_ptr<Module>& module, const OverlayContex
 
     if (ImGui::Checkbox(module->get_name(), &enabled)) { module->toggle(); }
 
+    if (module->is_enabled() && module->has_header_controls()) {
+      ImGui::SameLine(0.0f, 10.0f);
+      module->on_render_header_controls(ctx);
+    }
+
     if (module->get_description() != nullptr) {
       ImGui::SameLine();
       ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(kTextDim));

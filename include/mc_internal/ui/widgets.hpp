@@ -13,7 +13,10 @@ bool SliderFloat(
 bool Toggle(const char* label, bool* v);
 
 // Section label with dimmed text and a thin rule underneath.
-void SectionHeader(const char* label);
+void SectionHeader(const char* label, const char* tooltip = nullptr);
+
+// Small inline help marker that opens a wrapped tooltip on hover.
+void HelpMarker(const char* text);
 
 // Slider with a left-aligned label and right-aligned track.
 bool LabeledSlider(const char* label,

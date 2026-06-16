@@ -90,6 +90,10 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
                                                         kMinecraftClientGameRendererField,
                                                         kMinecraftClientGameRendererSignature,
                                                         kMinecraftClientClass);
+  minecraft_client_current_screen_field = env.GetFieldID(minecraft_client_class,
+                                                         kMinecraftClientCurrentScreenField,
+                                                         kMinecraftClientCurrentScreenSignature,
+                                                         kMinecraftClientClass);
   minecraft_client_get_render_tick_counter =
       env.GetMethodID(minecraft_client_class,
                       kMinecraftClientGetRenderTickCounterMethod,
@@ -219,6 +223,7 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
 
   if (minecraft_client_get_instance == nullptr || minecraft_client_player_field == nullptr ||
       minecraft_client_world_field == nullptr || minecraft_client_game_renderer_field == nullptr ||
+      minecraft_client_current_screen_field == nullptr ||
       minecraft_client_get_render_tick_counter == nullptr || client_world_get_entities == nullptr ||
       entity_is_alive == nullptr || entity_get_height == nullptr || entity_get_width == nullptr ||
       entity_get_last_render_pos == nullptr || game_renderer_get_camera == nullptr ||
@@ -326,6 +331,7 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   minecraft_client_player_field = nullptr;
   minecraft_client_world_field = nullptr;
   minecraft_client_game_renderer_field = nullptr;
+  minecraft_client_current_screen_field = nullptr;
   minecraft_client_get_render_tick_counter = nullptr;
   client_world_get_entities = nullptr;
   entity_get_x = nullptr;

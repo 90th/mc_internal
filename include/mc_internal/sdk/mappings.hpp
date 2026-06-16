@@ -26,6 +26,7 @@ inline constexpr std::string_view kAmbientEntityClass = "net/minecraft/class_142
 inline constexpr std::string_view kAnimalEntityClass = "net/minecraft/class_1429";
 inline constexpr std::string_view kItemEntityClass = "net/minecraft/class_1542";
 inline constexpr std::string_view kTextClass = "net/minecraft/class_2561";
+inline constexpr std::string_view kScreenClass = "net/minecraft/class_437";
 
 inline constexpr std::string_view kJavaLangIterableClass = "java/lang/Iterable";
 inline constexpr std::string_view kJavaUtilIteratorClass = "java/util/Iterator";
@@ -50,6 +51,9 @@ inline constexpr std::string_view kMinecraftClientWorldFieldSignature = "Lnet/mi
 inline constexpr std::string_view kMinecraftClientGameRendererField = "field_1773";
 inline constexpr std::string_view kMinecraftClientGameRendererSignature =
     "Lnet/minecraft/class_757;";
+inline constexpr std::string_view kMinecraftClientCurrentScreenField = "field_1755";
+inline constexpr std::string_view kMinecraftClientCurrentScreenSignature =
+    "Lnet/minecraft/class_437;";
 inline constexpr std::string_view kMinecraftClientGetRenderTickCounterMethod = "method_61966";
 inline constexpr std::string_view kMinecraftClientGetRenderTickCounterSignature =
     "()Lnet/minecraft/class_9779;";

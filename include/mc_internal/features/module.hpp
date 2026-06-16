@@ -24,6 +24,10 @@ class Module {
   // this stays reserved for floating overlays like the debug hud.
   virtual void on_render_ui(const OverlayContext& ctx) { static_cast<void>(ctx); }
 
+  // compact controls rendered beside the module title when enabled.
+  [[nodiscard]] virtual bool has_header_controls() const noexcept { return false; }
+  virtual void on_render_header_controls(const OverlayContext& ctx) { static_cast<void>(ctx); }
+
   // this stays reserved for widgets rendered inside the master menu.
   virtual void on_render_settings(const OverlayContext& ctx) { static_cast<void>(ctx); }
 

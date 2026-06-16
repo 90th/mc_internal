@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <limits>
+#include <string>
 
 #include "imgui.h"
 
@@ -178,6 +180,14 @@ struct AimPoint {
   double distance_sq = 0.0;
 };
 
+struct TargetCandidate {
+  bool valid = false;
+  int entity_id = 0;
+  float score = std::numeric_limits<float>::max();
+  float yaw = 0.0f;
+  float pitch = 0.0f;
+};
+
 AimPoint BuildAimPoint(const Vec3& camera_position,
                        float current_yaw,
                        float current_pitch,
@@ -196,9 +206,86 @@ AimPoint BuildAimPoint(const Vec3& camera_position,
   return {yaw, pitch, std::sqrt(yaw_delta * yaw_delta + pitch_delta * pitch_delta), distance_sq};
 }
 
-bool IsAttackHeld(const OverlayContext& ctx) {
-  return !ctx.show_menu && ctx.pinned_window != nullptr && ctx.glfw.get_mouse_button != nullptr &&
-         ctx.glfw.get_mouse_button(ctx.pinned_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+std::string MouseButtonName(int button) {
+  switch (button) {
+    case GLFW_MOUSE_BUTTON_LEFT:
+      return "left mouse";
+    case GLFW_MOUSE_BUTTON_RIGHT:
+      return "right mouse";
+    case GLFW_MOUSE_BUTTON_MIDDLE:
+      return "middle mouse";
+    default:
+      return "mouse " + std::to_string(button + 1);
+  }
+}
+
+std::string KeyName(int key) {
+  if (key >= GLFW_KEY_A && key <= GLFW_KEY_Z) {
+    return std::string(1, static_cast<char>('a' + key - GLFW_KEY_A));
+  }
+  if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
+    return std::string(1, static_cast<char>('0' + key - GLFW_KEY_0));
+  }
+  if (key >= GLFW_KEY_F1 && key <= GLFW_KEY_F12) {
+    return "f" + std::to_string(key - GLFW_KEY_F1 + 1);
+  }
+
+  switch (key) {
+    case GLFW_KEY_SPACE:
+      return "space";
+    case GLFW_KEY_TAB:
+      return "tab";
+    case GLFW_KEY_ENTER:
+      return "enter";
+    case GLFW_KEY_BACKSPACE:
+      return "backspace";
+    case GLFW_KEY_ESCAPE:
+      return "escape";
+    case GLFW_KEY_LEFT_SHIFT:
+      return "left shift";
+    case GLFW_KEY_RIGHT_SHIFT:
+      return "right shift";
+    case GLFW_KEY_LEFT_CONTROL:
+      return "left control";
+    case GLFW_KEY_RIGHT_CONTROL:
+      return "right control";
+    case GLFW_KEY_LEFT_ALT:
+      return "left alt";
+    case GLFW_KEY_RIGHT_ALT:
+      return "right alt";
+    case GLFW_KEY_INSERT:
+      return "insert";
+    case GLFW_KEY_DELETE:
+      return "delete";
+    case GLFW_KEY_HOME:
+      return "home";
+    case GLFW_KEY_END:
+      return "end";
+    case GLFW_KEY_PAGE_UP:
+      return "page up";
+    case GLFW_KEY_PAGE_DOWN:
+      return "page down";
+    default:
+      return "key " + std::to_string(key);
+  }
+}
+
+bool AnyBindInputDown(const OverlayContext& ctx) {
+  if (ctx.pinned_window == nullptr) { return false; }
+
+  if (ctx.glfw.get_mouse_button != nullptr) {
+    for (int button = GLFW_MOUSE_BUTTON_1; button <= GLFW_MOUSE_BUTTON_LAST; ++button) {
+      if (ctx.glfw.get_mouse_button(ctx.pinned_window, button) == GLFW_PRESS) { return true; }
+    }
+  }
+
+  if (ctx.glfw.get_key != nullptr) {
+    for (int key = GLFW_KEY_SPACE; key <= GLFW_KEY_LAST; ++key) {
+      if (ctx.glfw.get_key(ctx.pinned_window, key) == GLFW_PRESS) { return true; }
+    }
+  }
+
+  return false;
 }
 
 }  // namespace
@@ -208,23 +295,112 @@ AimAssistModule::AimAssistModule()
              "smoothly nudges aim toward nearby targets while attacking",
              ModuleCategory::kCombat) {}
 
+bool AimAssistModule::is_activation_held(const OverlayContext& ctx) const {
+  if (ctx.pinned_window == nullptr || activation_bind_code_ < 0) { return false; }
+
+  if (activation_bind_type_ == ActivationBindType::kMouse) {
+    return ctx.glfw.get_mouse_button != nullptr &&
+           ctx.glfw.get_mouse_button(ctx.pinned_window, activation_bind_code_) == GLFW_PRESS;
+  }
+
+  return ctx.glfw.get_key != nullptr &&
+         ctx.glfw.get_key(ctx.pinned_window, activation_bind_code_) == GLFW_PRESS;
+}
+
+std::string AimAssistModule::activation_bind_label() const {
+  if (activation_bind_code_ < 0) { return "unbound"; }
+  if (activation_bind_type_ == ActivationBindType::kMouse) {
+    return MouseButtonName(activation_bind_code_);
+  }
+  return KeyName(activation_bind_code_);
+}
+
+void AimAssistModule::update_bind_capture(const OverlayContext& ctx) {
+  if (!waiting_for_bind_ || ctx.pinned_window == nullptr) { return; }
+
+  if (!bind_capture_armed_) {
+    bind_capture_armed_ = !AnyBindInputDown(ctx);
+    return;
+  }
+
+  if (ctx.glfw.get_key != nullptr) {
+    if (ctx.glfw.get_key(ctx.pinned_window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+      waiting_for_bind_ = false;
+      bind_capture_armed_ = false;
+      return;
+    }
+    if (ctx.glfw.get_key(ctx.pinned_window, GLFW_KEY_BACKSPACE) == GLFW_PRESS) {
+      activation_bind_code_ = -1;
+      waiting_for_bind_ = false;
+      bind_capture_armed_ = false;
+      return;
+    }
+  }
+
+  if (ctx.glfw.get_mouse_button != nullptr) {
+    for (int button = GLFW_MOUSE_BUTTON_1; button <= GLFW_MOUSE_BUTTON_LAST; ++button) {
+      if (ctx.glfw.get_mouse_button(ctx.pinned_window, button) == GLFW_PRESS) {
+        activation_bind_type_ = ActivationBindType::kMouse;
+        activation_bind_code_ = button;
+        waiting_for_bind_ = false;
+        bind_capture_armed_ = false;
+        return;
+      }
+    }
+  }
+
+  if (ctx.glfw.get_key != nullptr) {
+    for (int key = GLFW_KEY_SPACE; key <= GLFW_KEY_LAST; ++key) {
+      if (ctx.glfw.get_key(ctx.pinned_window, key) == GLFW_PRESS) {
+        activation_bind_type_ = ActivationBindType::kKeyboard;
+        activation_bind_code_ = key;
+        waiting_for_bind_ = false;
+        bind_capture_armed_ = false;
+        return;
+      }
+    }
+  }
+}
+
+void AimAssistModule::on_render_header_controls(const OverlayContext& ctx) {
+  const std::string bind_label = waiting_for_bind_ ? "press key..." : activation_bind_label();
+  char button_label[96];
+  std::snprintf(button_label, sizeof(button_label), "%s##aim_activation_bind", bind_label.c_str());
+
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 3.0f));
+  if (ImGui::Button(button_label)) {
+    waiting_for_bind_ = true;
+    bind_capture_armed_ = false;
+  }
+  ImGui::PopStyleVar();
+
+  if (ImGui::IsItemHovered()) {
+    ImGui::BeginTooltip();
+    ImGui::TextUnformatted("hold this bind to select and track a target");
+    ImGui::TextUnformatted("escape cancels, backspace clears while recording");
+    ImGui::EndTooltip();
+  }
+
+  if (waiting_for_bind_) { update_bind_capture(ctx); }
+}
+
 void AimAssistModule::on_render_settings(const OverlayContext& ctx) {
   static_cast<void>(ctx);
 
-  ui::SectionHeader("targeting");
-  ui::DescriptionText(
+  ui::SectionHeader(
+      "targeting",
       "nudges your crosshair toward the closest target inside the configured field of view.");
-  ImGui::Spacing();
 
   ui::Toggle("target players", &target_players_);
+  ImGui::SameLine(0.0f, 14.0f);
   ui::Toggle("target hostiles", &target_hostiles_);
+  ImGui::SameLine(0.0f, 14.0f);
   ui::Toggle("line of sight only", &line_of_sight_only_);
 
-  ui::SectionHeader("tuning");
-  ui::DescriptionText(
+  ui::SectionHeader(
+      "tuning",
       "higher smoothness slows the correction and keeps the movement looking more human. target "
       "choice blends crosshair error with distance. prediction automatically adapts to movement.");
-  ImGui::Spacing();
 
   ui::LabeledSlider("field of view", "##aim_assist_fov", &fov_degrees_, 1.0f, 180.0f, "%.0f deg");
   ui::LabeledSlider("smoothness", "##aim_assist_smooth", &smoothness_, 1.0f, 20.0f, "%.1f");
@@ -233,23 +409,49 @@ void AimAssistModule::on_render_settings(const OverlayContext& ctx) {
 }
 
 void AimAssistModule::on_render_3d(const OverlayContext& ctx) {
-  if ((!target_players_ && !target_hostiles_) || !IsAttackHeld(ctx) || !ctx.jvm_attachment) {
+  const bool activation_down = is_activation_held(ctx);
+  if (!activation_down) {
+    locked_target_id_ = 0;
+    activation_was_down_ = false;
+    return;
+  }
+
+  if ((!target_players_ && !target_hostiles_) || ctx.show_menu || !ctx.jvm_attachment) {
+    locked_target_id_ = 0;
+    activation_was_down_ = activation_down;
     return;
   }
 
   const JniEnv env(ctx.jvm_attachment->env());
-  if (!ctx.jni_cache.Initialize(env)) { return; }
+  if (!ctx.jni_cache.Initialize(env)) {
+    locked_target_id_ = 0;
+    activation_was_down_ = activation_down;
+    return;
+  }
 
   auto minecraft_instance = Minecraft::GetInstance(env, ctx.jni_cache);
-  if (!minecraft_instance) { return; }
+  if (!minecraft_instance ||
+      Minecraft::HasOpenScreen(env, ctx.jni_cache, minecraft_instance.get())) {
+    locked_target_id_ = 0;
+    activation_was_down_ = activation_down;
+    return;
+  }
 
   auto local_player = Minecraft::GetLocalPlayer(env, ctx.jni_cache, minecraft_instance.get());
   auto world = Minecraft::GetWorld(env, ctx.jni_cache, minecraft_instance.get());
   auto game_renderer = Minecraft::GetGameRenderer(env, ctx.jni_cache, minecraft_instance.get());
-  if (!local_player || !world || !game_renderer) { return; }
+  if (!local_player || !world || !game_renderer) {
+    locked_target_id_ = 0;
+    activation_was_down_ = activation_down;
+    return;
+  }
 
   auto camera = GameRenderer::GetCamera(env, ctx.jni_cache, game_renderer.get());
-  if (!camera) { return; }
+  if (!camera) {
+    locked_target_id_ = 0;
+    activation_was_down_ = activation_down;
+    return;
+  }
 
   const Vec3 camera_position = Camera::GetPosition(env, ctx.jni_cache, camera.get());
   const float current_yaw = Camera::GetYaw(env, ctx.jni_cache, camera.get());
@@ -262,51 +464,55 @@ void AimAssistModule::on_render_3d(const OverlayContext& ctx) {
   const double max_distance_sq =
       static_cast<double>(max_distance_) * static_cast<double>(max_distance_);
 
-  bool has_target = false;
-  float best_score = 1e30f;
-  float best_target_yaw = 0.0f;
-  float best_target_pitch = 0.0f;
-  int best_target_id = 0;
+  const bool select_new_target = !activation_was_down_;
+  const int required_target_id = select_new_target ? 0 : locked_target_id_;
+  if (!select_new_target && required_target_id == 0) {
+    activation_was_down_ = activation_down;
+    return;
+  }
 
-  for (auto entity : ClientWorld::GetEntities(env, ctx.jni_cache, world.get())) {
-    if (!entity) { continue; }
-    if (env->IsSameObject(entity.get(), local_player.get()) == JNI_TRUE) { continue; }
-    if (!Entity::IsAlive(env, ctx.jni_cache, entity.get()) ||
-        Entity::IsInvisible(env, ctx.jni_cache, entity.get())) {
-      continue;
+  const auto build_candidate = [&](jobject entity, int requested_entity_id) -> TargetCandidate {
+    if (entity == nullptr) { return {}; }
+    if (env->IsSameObject(entity, local_player.get()) == JNI_TRUE) { return {}; }
+    if (!Entity::IsAlive(env, ctx.jni_cache, entity) ||
+        Entity::IsInvisible(env, ctx.jni_cache, entity)) {
+      return {};
     }
+
+    const int eid = Entity::GetId(env, ctx.jni_cache, entity);
+    if (eid == 0 || (requested_entity_id != 0 && eid != requested_entity_id)) { return {}; }
 
     bool matches = false;
     if (target_players_ && ctx.jni_cache.player_entity_class != nullptr &&
-        env->IsInstanceOf(entity.get(), ctx.jni_cache.player_entity_class)) {
+        env->IsInstanceOf(entity, ctx.jni_cache.player_entity_class)) {
       matches = true;
     }
 
     if (!matches && target_hostiles_) {
-      const std::string key = Entity::GetTranslationKey(env, ctx.jni_cache, entity.get());
+      const std::string key = Entity::GetTranslationKey(env, ctx.jni_cache, entity);
       matches = !key.empty() && IsTrackedHostile(key);
     }
 
-    if (!matches) { continue; }
+    if (!matches) { return {}; }
     if (line_of_sight_only_ &&
-        !LivingEntity::HasLineOfSight(env, ctx.jni_cache, local_player.get(), entity.get())) {
-      continue;
+        !LivingEntity::HasLineOfSight(env, ctx.jni_cache, local_player.get(), entity)) {
+      return {};
     }
 
-    auto [entity_x, entity_y, entity_z] = Entity::GetCoordinates(env, ctx.jni_cache, entity.get());
-    const double target_eye_y = Entity::GetEyeY(env, ctx.jni_cache, entity.get());
+    auto [entity_x, entity_y, entity_z] = Entity::GetCoordinates(env, ctx.jni_cache, entity);
+    const double target_eye_y = Entity::GetEyeY(env, ctx.jni_cache, entity);
     const double dx = entity_x - camera_position.x;
     const double dy = target_eye_y - camera_position.y;
     const double dz = entity_z - camera_position.z;
     const double distance_sq = dx * dx + dy * dy + dz * dz;
-    if (distance_sq <= 0.0001 || distance_sq > max_distance_sq) { continue; }
+    if (distance_sq <= 0.0001 || distance_sq > max_distance_sq) { return {}; }
 
-    const EntityData entity_data = Entity::GetData(env, ctx.jni_cache, entity.get());
+    const EntityData entity_data = Entity::GetData(env, ctx.jni_cache, entity);
     const double half_width = std::max(static_cast<double>(entity_data.width), 0.3) * 0.5;
     const double height = std::max(static_cast<double>(entity_data.height), 0.6);
     const Vec3 target_position{entity_x, entity_y, entity_z};
     const Vec3 target_velocity = ClampHorizontalVelocity(
-        Entity::GetVelocity(env, ctx.jni_cache, entity.get()), kMaxPredictedHorizontalSpeed);
+        Entity::GetVelocity(env, ctx.jni_cache, entity), kMaxPredictedHorizontalSpeed);
     const Vec3 relative_velocity{
         target_velocity.x - local_velocity.x, 0.0, target_velocity.z - local_velocity.z};
     const float prediction_strength = SmartPredictionStrength(std::sqrt(distance_sq),
@@ -350,37 +556,41 @@ void AimAssistModule::on_render_3d(const OverlayContext& ctx) {
     }
 
     const float fov_delta = scoring_point.fov_delta;
-    if (fov_delta > fov_limit) { continue; }
+    if (fov_delta > fov_limit) { return {}; }
 
     const AimPoint aim_point =
         BuildAimPoint(camera_position, current_yaw, current_pitch, desired_aim_point);
-    if (aim_point.distance_sq <= 0.0001) { continue; }
+    if (aim_point.distance_sq <= 0.0001) { return {}; }
 
     const float normalized_fov = std::clamp(fov_delta / fov_limit, 0.0f, 1.0f);
     const float normalized_distance =
         std::clamp(static_cast<float>(distance_sq / max_distance_sq), 0.0f, 1.0f);
-    float score = normalized_fov * 0.75f + normalized_distance * 0.25f;
-    const int eid = Entity::GetId(env, ctx.jni_cache, entity.get());
-    if (eid != 0 && eid == locked_target_id_) { score *= 0.82f; }
+    const float score = normalized_fov * 0.75f + normalized_distance * 0.25f;
+    return {true, eid, score, aim_point.yaw, aim_point.pitch};
+  };
 
-    if (score < best_score) {
-      best_score = score;
-      best_target_yaw = aim_point.yaw;
-      best_target_pitch = aim_point.pitch;
-      best_target_id = eid;
-      has_target = true;
+  TargetCandidate best_target{};
+  for (auto entity : ClientWorld::GetEntities(env, ctx.jni_cache, world.get())) {
+    TargetCandidate candidate = build_candidate(entity.get(), required_target_id);
+    if (!candidate.valid) { continue; }
+
+    if (candidate.score < best_target.score) {
+      best_target = candidate;
+      if (required_target_id != 0) { break; }
     }
   }
 
-  if (!has_target) {
+  if (!best_target.valid) {
     locked_target_id_ = 0;
+    activation_was_down_ = activation_down;
     return;
   }
 
-  locked_target_id_ = best_target_id;
+  locked_target_id_ = best_target.entity_id;
+  activation_was_down_ = activation_down;
 
-  const float next_yaw = current_yaw + WrapDegrees(best_target_yaw - current_yaw) / smoothness_;
-  const float next_pitch = current_pitch + (best_target_pitch - current_pitch) / smoothness_;
+  const float next_yaw = current_yaw + WrapDegrees(best_target.yaw - current_yaw) / smoothness_;
+  const float next_pitch = current_pitch + (best_target.pitch - current_pitch) / smoothness_;
 
   Entity::SetYaw(env, ctx.jni_cache, local_player.get(), next_yaw);
   Entity::SetPitch(env, ctx.jni_cache, local_player.get(), ClampPitch(next_pitch));

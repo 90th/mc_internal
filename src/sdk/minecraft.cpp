@@ -176,6 +176,23 @@ Minecraft::GetGameRenderer(const JniEnv& env, const JniCache& cache, jobject min
                                  kMinecraftClientGameRendererSignature);
 }
 
+bool Minecraft::HasOpenScreen(const JniEnv& env,
+                              const JniCache& cache,
+                              jobject minecraft_instance) {
+  if (!env || !cache.is_initialized() || minecraft_instance == nullptr ||
+      cache.minecraft_client_current_screen_field == nullptr) {
+    return false;
+  }
+
+  auto screen = GetObjectFieldReference(env,
+                                        minecraft_instance,
+                                        cache.minecraft_client_current_screen_field,
+                                        kMinecraftClientClass,
+                                        kMinecraftClientCurrentScreenField,
+                                        kMinecraftClientCurrentScreenSignature);
+  return static_cast<bool>(screen);
+}
+
 float Minecraft::GetTickDelta(const JniEnv& env,
                               const JniCache& cache,
                               jobject minecraft_instance) {

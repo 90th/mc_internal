@@ -35,6 +35,8 @@ class Minecraft {
   GetWorld(const JniEnv& env, const JniCache& cache, jobject minecraft_instance);
   [[nodiscard]] static ScopedLocalRef<jobject>
   GetGameRenderer(const JniEnv& env, const JniCache& cache, jobject minecraft_instance);
+  [[nodiscard]] static bool
+  HasOpenScreen(const JniEnv& env, const JniCache& cache, jobject minecraft_instance);
   [[nodiscard]] static float
   GetTickDelta(const JniEnv& env, const JniCache& cache, jobject minecraft_instance);
 };

@@ -318,10 +318,9 @@ bool IsPassiveClassMatch(JNIEnv* env, const JniCache& cache, jobject entity) {
 void EspModule::on_render_settings(const OverlayContext& ctx) {
   static_cast<void>(ctx);
 
-  ui::SectionHeader("target groups");
-  ui::DescriptionText(
+  ui::SectionHeader(
+      "target groups",
       "separate entity buckets by color and box style so crowded scenes stay readable.");
-  ImGui::Spacing();
 
   const float region_x = ImGui::GetCursorPosX();
   const float avail = ImGui::GetContentRegionAvail().x;
@@ -413,9 +412,8 @@ void EspModule::on_render_settings(const OverlayContext& ctx) {
                      color_x,
                      kGroupColorEditFlags);
 
-  ui::SectionHeader("overlay tuning");
-  ui::DescriptionText("adjust how far esp reaches and which labels are worth drawing every frame.");
-  ImGui::Spacing();
+  ui::SectionHeader("overlay tuning",
+                    "adjust how far esp reaches and which labels are worth drawing every frame.");
 
   ui::LabeledSlider("render distance",
                     "##esp_max_render_distance",
