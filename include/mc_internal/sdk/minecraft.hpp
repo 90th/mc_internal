@@ -88,6 +88,10 @@ class Entity {
   [[nodiscard]] static std::string
   GetName(const JniEnv& env, const JniCache& cache, jobject entity);
   [[nodiscard]] static int GetId(const JniEnv& env, const JniCache& cache, jobject entity);
+  [[nodiscard]] static double GetEyeY(const JniEnv& env, const JniCache& cache, jobject entity);
+  [[nodiscard]] static bool IsInvisible(const JniEnv& env, const JniCache& cache, jobject entity);
+  static void SetYaw(const JniEnv& env, const JniCache& cache, jobject entity, float yaw);
+  static void SetPitch(const JniEnv& env, const JniCache& cache, jobject entity, float pitch);
 };
 
 class LivingEntity {
@@ -96,6 +100,8 @@ class LivingEntity {
   [[nodiscard]] static float GetMaxHealth(const JniEnv& env, const JniCache& cache, jobject entity);
   [[nodiscard]] static float
   GetAbsorptionAmount(const JniEnv& env, const JniCache& cache, jobject entity);
+  [[nodiscard]] static bool
+  HasLineOfSight(const JniEnv& env, const JniCache& cache, jobject entity, jobject target);
 };
 
 }  // namespace mc_internal

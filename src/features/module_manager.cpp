@@ -1,6 +1,7 @@
 #include "mc_internal/features/module_manager.hpp"
 
 #include "mc_internal/context.hpp"
+#include "mc_internal/features/aim_assist_module.hpp"
 #include "mc_internal/features/debug_hud_module.hpp"
 #include "mc_internal/features/esp_module.hpp"
 
@@ -16,6 +17,8 @@ void ModuleManager::Initialize() const {
   auto esp = std::make_unique<EspModule>();
   esp->toggle();
   modules_.push_back(std::move(esp));
+
+  modules_.push_back(std::make_unique<AimAssistModule>());
 
   initialized_ = true;
 }

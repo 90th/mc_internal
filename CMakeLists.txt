@@ -94,6 +94,7 @@ target_sources(mc_internal PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/features/module_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/features/debug_hud_module.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/features/esp_module.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/features/aim_assist_module.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ui/opengl_state.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ui/imgui_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ui/input_handler.cpp

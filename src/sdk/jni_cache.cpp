@@ -154,6 +154,14 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
       env.GetMethodID(entity_class, kEntityGetNameMethod, kEntityGetNameSignature, kEntityClass);
   entity_get_id =
       env.GetMethodID(entity_class, kEntityGetIdMethod, kEntityGetIdSignature, kEntityClass);
+  entity_get_eye_y =
+      env.GetMethodID(entity_class, kEntityGetEyeYMethod, kEntityGetEyeYSignature, kEntityClass);
+  entity_is_invisible = env.GetMethodID(
+      entity_class, kEntityIsInvisibleMethod, kEntityIsInvisibleSignature, kEntityClass);
+  entity_set_yaw =
+      env.GetMethodID(entity_class, kEntitySetYawMethod, kEntitySetYawSignature, kEntityClass);
+  entity_set_pitch =
+      env.GetMethodID(entity_class, kEntitySetPitchMethod, kEntitySetPitchSignature, kEntityClass);
 
   living_entity_get_health = env.GetMethodID(living_entity_class,
                                              kLivingEntityGetHealthMethod,
@@ -167,6 +175,10 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
                                                         kLivingEntityGetAbsorptionAmountMethod,
                                                         kLivingEntityGetAbsorptionAmountSignature,
                                                         kLivingEntityClass);
+  living_entity_has_line_of_sight = env.GetMethodID(living_entity_class,
+                                                    kLivingEntityHasLineOfSightMethod,
+                                                    kLivingEntityHasLineOfSightSignature,
+                                                    kLivingEntityClass);
 
   {
     auto entity_type_class = CacheGlobalClass(env, kEntityTypeClass);
@@ -214,8 +226,10 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
       vec3d_y_field == nullptr || vec3d_z_field == nullptr || entity_get_x == nullptr ||
       entity_get_y == nullptr || entity_get_z == nullptr || iterable_iterator == nullptr ||
       iterator_has_next == nullptr || iterator_next == nullptr || entity_get_type == nullptr ||
-      living_entity_get_health == nullptr || living_entity_get_max_health == nullptr ||
-      living_entity_get_absorption_amount == nullptr) {
+      entity_get_eye_y == nullptr || entity_is_invisible == nullptr || entity_set_yaw == nullptr ||
+      entity_set_pitch == nullptr || living_entity_get_health == nullptr ||
+      living_entity_get_max_health == nullptr || living_entity_get_absorption_amount == nullptr ||
+      living_entity_has_line_of_sight == nullptr) {
     Reset(env.get());
     PrintStatus("jni cache initialization failed: missing member handles");
     return false;
@@ -320,10 +334,15 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   entity_get_width = nullptr;
   entity_get_type = nullptr;
   entity_get_name = nullptr;
+  entity_get_eye_y = nullptr;
+  entity_is_invisible = nullptr;
+  entity_set_yaw = nullptr;
+  entity_set_pitch = nullptr;
   entity_type_translation_key_field = nullptr;
   living_entity_get_health = nullptr;
   living_entity_get_max_health = nullptr;
   living_entity_get_absorption_amount = nullptr;
+  living_entity_has_line_of_sight = nullptr;
   entity_get_id = nullptr;
   player_entity_get_game_profile = nullptr;
   game_profile_get_name = nullptr;

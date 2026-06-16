@@ -78,6 +78,14 @@ inline constexpr std::string_view kEntityGetNameMethod = "method_5477";
 inline constexpr std::string_view kEntityGetNameSignature = "()Lnet/minecraft/class_2561;";
 inline constexpr std::string_view kEntityGetIdMethod = "method_5628";
 inline constexpr std::string_view kEntityGetIdSignature = "()I";
+inline constexpr std::string_view kEntityGetEyeYMethod = "method_23320";
+inline constexpr std::string_view kEntityGetEyeYSignature = "()D";
+inline constexpr std::string_view kEntityIsInvisibleMethod = "method_5767";
+inline constexpr std::string_view kEntityIsInvisibleSignature = "()Z";
+inline constexpr std::string_view kEntitySetYawMethod = "method_36456";
+inline constexpr std::string_view kEntitySetYawSignature = "(F)V";
+inline constexpr std::string_view kEntitySetPitchMethod = "method_36457";
+inline constexpr std::string_view kEntitySetPitchSignature = "(F)V";
 
 inline constexpr std::string_view kPlayerEntityClass = "net/minecraft/class_1657";
 inline constexpr std::string_view kPlayerEntityGetGameProfileMethod = "method_7334";
@@ -94,6 +102,9 @@ inline constexpr std::string_view kLivingEntityGetMaxHealthMethod = "method_6063
 inline constexpr std::string_view kLivingEntityGetMaxHealthSignature = "()F";
 inline constexpr std::string_view kLivingEntityGetAbsorptionAmountMethod = "method_6067";
 inline constexpr std::string_view kLivingEntityGetAbsorptionAmountSignature = "()F";
+inline constexpr std::string_view kLivingEntityHasLineOfSightMethod = "method_6057";
+inline constexpr std::string_view kLivingEntityHasLineOfSightSignature =
+    "(Lnet/minecraft/class_1297;)Z";
 
 inline constexpr std::string_view kTextGetStringMethod = "getString";
 inline constexpr std::string_view kTextGetStringSignature = "()Ljava/lang/String;";

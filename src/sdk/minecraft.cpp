@@ -491,6 +491,35 @@ int Entity::GetId(const JniEnv& env, const JniCache& cache, jobject entity) {
   return static_cast<int>(env->CallIntMethod(entity, cache.entity_get_id));
 }
 
+double Entity::GetEyeY(const JniEnv& env, const JniCache& cache, jobject entity) {
+  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_get_eye_y == nullptr) {
+    return 0.0;
+  }
+  return static_cast<double>(env->CallDoubleMethod(entity, cache.entity_get_eye_y));
+}
+
+bool Entity::IsInvisible(const JniEnv& env, const JniCache& cache, jobject entity) {
+  if (!env || !cache.is_initialized() || entity == nullptr ||
+      cache.entity_is_invisible == nullptr) {
+    return false;
+  }
+  return env->CallBooleanMethod(entity, cache.entity_is_invisible) == JNI_TRUE;
+}
+
+void Entity::SetYaw(const JniEnv& env, const JniCache& cache, jobject entity, float yaw) {
+  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_set_yaw == nullptr) {
+    return;
+  }
+  env->CallVoidMethod(entity, cache.entity_set_yaw, static_cast<jfloat>(yaw));
+}
+
+void Entity::SetPitch(const JniEnv& env, const JniCache& cache, jobject entity, float pitch) {
+  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_set_pitch == nullptr) {
+    return;
+  }
+  env->CallVoidMethod(entity, cache.entity_set_pitch, static_cast<jfloat>(pitch));
+}
+
 EntityData Entity::GetData(const JniEnv& env, const JniCache& cache, jobject entity) {
   EntityData data{};
   if (!env || !cache.is_initialized() || entity == nullptr) { return data; }
@@ -548,6 +577,17 @@ float LivingEntity::GetAbsorptionAmount(const JniEnv& env, const JniCache& cache
                          kLivingEntityClass,
                          kLivingEntityGetAbsorptionAmountMethod,
                          kLivingEntityGetAbsorptionAmountSignature);
+}
+
+bool LivingEntity::HasLineOfSight(const JniEnv& env,
+                                  const JniCache& cache,
+                                  jobject entity,
+                                  jobject target) {
+  if (!env || !cache.is_initialized() || entity == nullptr || target == nullptr ||
+      cache.living_entity_has_line_of_sight == nullptr) {
+    return false;
+  }
+  return env->CallBooleanMethod(entity, cache.living_entity_has_line_of_sight, target) == JNI_TRUE;
 }
 
 }  // namespace mc_internal

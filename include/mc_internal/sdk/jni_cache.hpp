@@ -57,10 +57,15 @@ struct JniCache {
   jmethodID entity_get_type = nullptr;
   jmethodID entity_get_name = nullptr;
   jmethodID entity_get_id = nullptr;
+  jmethodID entity_get_eye_y = nullptr;
+  jmethodID entity_is_invisible = nullptr;
+  jmethodID entity_set_yaw = nullptr;
+  jmethodID entity_set_pitch = nullptr;
   jfieldID entity_type_translation_key_field = nullptr;
   jmethodID living_entity_get_health = nullptr;
   jmethodID living_entity_get_max_health = nullptr;
   jmethodID living_entity_get_absorption_amount = nullptr;
+  jmethodID living_entity_has_line_of_sight = nullptr;
   jmethodID player_entity_get_game_profile = nullptr;
   jmethodID game_profile_get_name = nullptr;
   jmethodID text_get_string = nullptr;
