@@ -424,7 +424,8 @@ std::string Entity::GetName(const JniEnv& env, const JniCache& cache, jobject en
   if (!env || !cache.is_initialized() || entity == nullptr) { return {}; }
 
   if (cache.player_entity_get_game_profile != nullptr && cache.game_profile_get_name != nullptr &&
-      env->IsInstanceOf(entity, cache.client_player_entity_class)) {
+      cache.player_entity_class != nullptr &&
+      env->IsInstanceOf(entity, cache.player_entity_class)) {
     auto profile = CallObjectMethodReference(env,
                                              entity,
                                              cache.player_entity_get_game_profile,

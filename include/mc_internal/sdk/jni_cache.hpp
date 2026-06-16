@@ -19,6 +19,7 @@ struct JniCache {
 
   jclass minecraft_client_class = nullptr;
   jclass client_player_entity_class = nullptr;
+  jclass player_entity_class = nullptr;
   jclass client_world_class = nullptr;
   jclass entity_class = nullptr;
   jclass game_renderer_class = nullptr;
@@ -30,6 +31,12 @@ struct JniCache {
   jclass java_util_iterator_class = nullptr;
   jclass hostile_entity_class = nullptr;
   jclass passive_entity_class = nullptr;
+  jclass golem_entity_class = nullptr;
+  jclass villager_entity_class = nullptr;
+  jclass merchant_entity_class = nullptr;
+  jclass water_creature_entity_class = nullptr;
+  jclass ambient_entity_class = nullptr;
+  jclass animal_entity_class = nullptr;
   jclass item_entity_class = nullptr;
   jclass living_entity_class = nullptr;
 

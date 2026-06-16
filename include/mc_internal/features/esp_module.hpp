@@ -10,6 +10,7 @@
 namespace mc_internal {
 
 inline constexpr int kHostileMobCount = 37;
+inline constexpr int kPassiveMobCount = 42;
 
 class EspModule : public Module {
  public:
@@ -20,6 +21,7 @@ class EspModule : public Module {
 
  private:
   void RebuildHostileFilter();
+  void RebuildPassiveFilter();
   bool AllHostilesVisible() const;
 
   struct TargetGroupState {
@@ -37,9 +39,13 @@ class EspModule : public Module {
   TargetGroupState passive_group_ = {false, {0.24f, 0.78f, 0.42f, 1.0f}, 0};
   TargetGroupState item_group_ = {false, {0.92f, 0.76f, 0.20f, 1.0f}, 0};
   std::array<bool, kHostileMobCount> hostile_mob_visible_{};
+  std::array<bool, kPassiveMobCount> passive_mob_visible_{};
   std::unordered_set<std::string_view> hidden_hostile_keys_;
+  std::unordered_set<std::string_view> hidden_passive_keys_;
   bool hostile_filter_dirty_ = true;
+  bool passive_filter_dirty_ = true;
   ui::FilteredChecklistState hostile_checklist_state_{};
+  ui::FilteredChecklistState passive_checklist_state_{};
 };
 
 }  // namespace mc_internal

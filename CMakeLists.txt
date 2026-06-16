@@ -94,11 +94,11 @@ target_sources(mc_internal PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/features/module_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/features/debug_hud_module.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/features/esp_module.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/opengl_state.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/imgui_manager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/input_handler.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/widgets.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/menu.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ui/opengl_state.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ui/imgui_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ui/input_handler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ui/widgets.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ui/menu.cpp
 )
 
 target_compile_features(mc_internal PRIVATE cxx_std_23)

@@ -18,6 +18,12 @@ inline constexpr std::string_view kEntityTypeClass = "net/minecraft/class_1299";
 inline constexpr std::string_view kLivingEntityClass = "net/minecraft/class_1309";
 inline constexpr std::string_view kHostileEntityClass = "net/minecraft/class_1588";
 inline constexpr std::string_view kPassiveEntityClass = "net/minecraft/class_1296";
+inline constexpr std::string_view kGolemEntityClass = "net/minecraft/class_1427";
+inline constexpr std::string_view kVillagerEntityClass = "net/minecraft/class_1646";
+inline constexpr std::string_view kMerchantEntityClass = "net/minecraft/class_3988";
+inline constexpr std::string_view kWaterCreatureEntityClass = "net/minecraft/class_1480";
+inline constexpr std::string_view kAmbientEntityClass = "net/minecraft/class_1421";
+inline constexpr std::string_view kAnimalEntityClass = "net/minecraft/class_1429";
 inline constexpr std::string_view kItemEntityClass = "net/minecraft/class_1542";
 inline constexpr std::string_view kTextClass = "net/minecraft/class_2561";
 
@@ -89,7 +95,7 @@ inline constexpr std::string_view kLivingEntityGetMaxHealthSignature = "()F";
 inline constexpr std::string_view kLivingEntityGetAbsorptionAmountMethod = "method_6067";
 inline constexpr std::string_view kLivingEntityGetAbsorptionAmountSignature = "()F";
 
-inline constexpr std::string_view kTextGetStringMethod = "method_10851";
+inline constexpr std::string_view kTextGetStringMethod = "getString";
 inline constexpr std::string_view kTextGetStringSignature = "()Ljava/lang/String;";
 
 inline constexpr std::string_view kEntityTypeTranslationKeyField = "field_6106";

@@ -38,6 +38,7 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
 
   minecraft_client_class = CacheGlobalClass(env, kMinecraftClientClass);
   client_player_entity_class = CacheGlobalClass(env, kClientPlayerEntityClass);
+  player_entity_class = CacheGlobalClass(env, kPlayerEntityClass);
   client_world_class = CacheGlobalClass(env, kClientWorldClass);
   entity_class = CacheGlobalClass(env, kEntityClass);
   game_renderer_class = CacheGlobalClass(env, kGameRendererClass);
@@ -49,16 +50,25 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
   java_util_iterator_class = CacheGlobalClass(env, kJavaUtilIteratorClass);
   hostile_entity_class = CacheGlobalClass(env, kHostileEntityClass);
   passive_entity_class = CacheGlobalClass(env, kPassiveEntityClass);
+  golem_entity_class = CacheGlobalClass(env, kGolemEntityClass);
+  villager_entity_class = CacheGlobalClass(env, kVillagerEntityClass);
+  merchant_entity_class = CacheGlobalClass(env, kMerchantEntityClass);
+  water_creature_entity_class = CacheGlobalClass(env, kWaterCreatureEntityClass);
+  ambient_entity_class = CacheGlobalClass(env, kAmbientEntityClass);
+  animal_entity_class = CacheGlobalClass(env, kAnimalEntityClass);
   item_entity_class = CacheGlobalClass(env, kItemEntityClass);
   living_entity_class = CacheGlobalClass(env, kLivingEntityClass);
 
   if (minecraft_client_class == nullptr || client_player_entity_class == nullptr ||
-      client_world_class == nullptr || entity_class == nullptr || game_renderer_class == nullptr ||
-      camera_class == nullptr || vec3d_class == nullptr || render_tick_counter_class == nullptr ||
-      joml_matrix4f_class == nullptr || java_lang_iterable_class == nullptr ||
-      java_util_iterator_class == nullptr || hostile_entity_class == nullptr ||
-      passive_entity_class == nullptr || item_entity_class == nullptr ||
-      living_entity_class == nullptr) {
+      player_entity_class == nullptr || client_world_class == nullptr || entity_class == nullptr ||
+      game_renderer_class == nullptr || camera_class == nullptr || vec3d_class == nullptr ||
+      render_tick_counter_class == nullptr || joml_matrix4f_class == nullptr ||
+      java_lang_iterable_class == nullptr || java_util_iterator_class == nullptr ||
+      hostile_entity_class == nullptr || passive_entity_class == nullptr ||
+      golem_entity_class == nullptr || villager_entity_class == nullptr ||
+      merchant_entity_class == nullptr || water_creature_entity_class == nullptr ||
+      ambient_entity_class == nullptr || animal_entity_class == nullptr ||
+      item_entity_class == nullptr || living_entity_class == nullptr) {
     Reset(env.get());
     PrintStatus("jni cache initialization failed: missing class handles");
     return false;
@@ -178,10 +188,10 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
     }
   }
 
-  player_entity_get_game_profile = env.GetMethodID(client_player_entity_class,
+  player_entity_get_game_profile = env.GetMethodID(player_entity_class,
                                                    kPlayerEntityGetGameProfileMethod,
                                                    kPlayerEntityGetGameProfileSignature,
-                                                   kClientPlayerEntityClass);
+                                                   kPlayerEntityClass);
   if (player_entity_get_game_profile != nullptr) {
     auto game_profile_class = CacheGlobalClass(env, kGameProfileClass);
     if (game_profile_class != nullptr) {
@@ -223,6 +233,9 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   if (env != nullptr && client_player_entity_class != nullptr) {
     env->DeleteGlobalRef(client_player_entity_class);
   }
+  if (env != nullptr && player_entity_class != nullptr) {
+    env->DeleteGlobalRef(player_entity_class);
+  }
   if (env != nullptr && client_world_class != nullptr) { env->DeleteGlobalRef(client_world_class); }
   if (env != nullptr && entity_class != nullptr) { env->DeleteGlobalRef(entity_class); }
   if (env != nullptr && game_renderer_class != nullptr) {
@@ -248,6 +261,22 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   if (env != nullptr && passive_entity_class != nullptr) {
     env->DeleteGlobalRef(passive_entity_class);
   }
+  if (env != nullptr && golem_entity_class != nullptr) { env->DeleteGlobalRef(golem_entity_class); }
+  if (env != nullptr && villager_entity_class != nullptr) {
+    env->DeleteGlobalRef(villager_entity_class);
+  }
+  if (env != nullptr && merchant_entity_class != nullptr) {
+    env->DeleteGlobalRef(merchant_entity_class);
+  }
+  if (env != nullptr && water_creature_entity_class != nullptr) {
+    env->DeleteGlobalRef(water_creature_entity_class);
+  }
+  if (env != nullptr && ambient_entity_class != nullptr) {
+    env->DeleteGlobalRef(ambient_entity_class);
+  }
+  if (env != nullptr && animal_entity_class != nullptr) {
+    env->DeleteGlobalRef(animal_entity_class);
+  }
   if (env != nullptr && item_entity_class != nullptr) { env->DeleteGlobalRef(item_entity_class); }
   if (env != nullptr && living_entity_class != nullptr) {
     env->DeleteGlobalRef(living_entity_class);
@@ -255,6 +284,7 @@ void JniCache::Reset(JNIEnv* env) noexcept {
 
   minecraft_client_class = nullptr;
   client_player_entity_class = nullptr;
+  player_entity_class = nullptr;
   client_world_class = nullptr;
   entity_class = nullptr;
   game_renderer_class = nullptr;
@@ -266,6 +296,12 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   java_util_iterator_class = nullptr;
   hostile_entity_class = nullptr;
   passive_entity_class = nullptr;
+  golem_entity_class = nullptr;
+  villager_entity_class = nullptr;
+  merchant_entity_class = nullptr;
+  water_creature_entity_class = nullptr;
+  ambient_entity_class = nullptr;
+  animal_entity_class = nullptr;
   item_entity_class = nullptr;
   living_entity_class = nullptr;
 

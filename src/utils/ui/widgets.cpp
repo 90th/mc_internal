@@ -257,7 +257,10 @@ bool FilteredChecklist(const char* id,
   ImGui::PushItemWidth(preview_width);
   const char* popup_id = id;
 
-  if (ImGui::Button(preview, ImVec2(preview_width, 0))) {
+  char button_id[128];
+  std::snprintf(button_id, sizeof(button_id), "%s###%s_btn", preview, id);
+
+  if (ImGui::Button(button_id, ImVec2(preview_width, 0))) {
     ImGui::OpenPopup(popup_id);
     state.popup_open = true;
     state.search_buf[0] = '\0';
