@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "imgui.h"
@@ -624,30 +625,59 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
       const float max_health = LivingEntity::GetMaxHealth(env, ctx.jni_cache, entity.get());
 
       if (max_health > 0.0f) {
-        constexpr float kBarHeight = 2.0f;
+        constexpr float kCloseBarHeight = 4.0f;
+        constexpr float kFarBarHeight = 2.0f;
+        constexpr float kHealthBarCloseDistance = 8.0f;
+        constexpr float kHealthBarFarDistance = 56.0f;
+
+        const float distance_t = std::clamp((distance - kHealthBarCloseDistance) /
+                                                (kHealthBarFarDistance - kHealthBarCloseDistance),
+                                            0.0f,
+                                            1.0f);
+        const float bar_height =
+            static_cast<float>(Lerp(kCloseBarHeight, kFarBarHeight, distance_t));
         const float bar_width = smax_x - smin_x;
-        const float bar_y = above_y - kBarHeight - 2.0f;
+        const float bar_y = above_y - bar_height - 2.0f;
         const float health_ratio = std::clamp(health / max_health, 0.0f, 1.0f);
         const int eid = Entity::GetId(env, ctx.jni_cache, entity.get());
 
+        static std::unordered_map<int, float> previous_health_ratios;
+        static std::unordered_map<int, float> damage_pulses;
+
+        float& previous_health_ratio = previous_health_ratios[eid];
+        float& damage_pulse = damage_pulses[eid];
+        if (previous_health_ratio > 0.0f && health_ratio < previous_health_ratio - 0.001f) {
+          const float damage_delta = previous_health_ratio - health_ratio;
+          damage_pulse =
+              std::clamp(damage_pulse + std::clamp(damage_delta * 4.0f, 0.25f, 1.0f), 0.0f, 1.0f);
+        }
+        previous_health_ratio = health_ratio;
+
+        damage_pulse = std::max(0.0f, damage_pulse - ImGui::GetIO().DeltaTime * 2.8f);
+
+        const int border_alpha = static_cast<int>(Lerp(145.0, 75.0, distance_t) * alpha_mult);
+        const int trail_alpha = static_cast<int>(Lerp(165.0, 230.0, damage_pulse) * alpha_mult);
+        const ImU32 trail_color = ui::LerpColor(
+            IM_COL32(145, 145, 145, trail_alpha), IM_COL32(255, 95, 55, trail_alpha), damage_pulse);
+
         draw_list->AddRectFilled(ImVec2(smin_x, bar_y),
-                                 ImVec2(smax_x, bar_y + kBarHeight),
+                                 ImVec2(smax_x, bar_y + bar_height),
                                  IM_COL32(0, 0, 0, static_cast<int>(80.0f * alpha_mult)));
 
         const ImGuiID trail_id = static_cast<ImGuiID>(eid) ^ 0xDA47u;
-        float trail_ratio = ui::Anim::Lerp(trail_id, health_ratio, 3.0f);
+        float trail_ratio = ui::Anim::Lerp(trail_id, health_ratio, 2.3f);
         trail_ratio = std::max(trail_ratio, health_ratio);
         if (trail_ratio > health_ratio + 0.001f) {
           draw_list->AddRectFilled(ImVec2(smin_x + bar_width * health_ratio, bar_y),
-                                   ImVec2(smin_x + bar_width * trail_ratio, bar_y + kBarHeight),
-                                   IM_COL32(140, 140, 140, static_cast<int>(160.0f * alpha_mult)));
+                                   ImVec2(smin_x + bar_width * trail_ratio, bar_y + bar_height),
+                                   trail_color);
         }
 
         if (health_ratio > 0.0f) {
           const float hr = std::clamp((1.0f - health_ratio) * 2.0f, 0.0f, 1.0f);
           const float hg = std::clamp(health_ratio * 2.0f, 0.0f, 1.0f);
           draw_list->AddRectFilled(ImVec2(smin_x, bar_y),
-                                   ImVec2(smin_x + bar_width * health_ratio, bar_y + kBarHeight),
+                                   ImVec2(smin_x + bar_width * health_ratio, bar_y + bar_height),
                                    IM_COL32(static_cast<int>(hr * 255),
                                             static_cast<int>(hg * 255),
                                             0,
@@ -661,10 +691,17 @@ void EspModule::on_render_3d(const OverlayContext& ctx) {
           if (abs_ratio > 0.001f) {
             draw_list->AddRectFilled(
                 ImVec2(smin_x + bar_width * health_ratio, bar_y),
-                ImVec2(smin_x + bar_width * (health_ratio + abs_ratio), bar_y + kBarHeight),
+                ImVec2(smin_x + bar_width * (health_ratio + abs_ratio), bar_y + bar_height),
                 IM_COL32(255, 200, 40, static_cast<int>(200.0f * alpha_mult)));
           }
         }
+
+        draw_list->AddRect(ImVec2(smin_x, bar_y),
+                           ImVec2(smax_x, bar_y + bar_height),
+                           IM_COL32(0, 0, 0, border_alpha),
+                           0.0f,
+                           0,
+                           1.0f);
 
         above_y = bar_y;
       }
