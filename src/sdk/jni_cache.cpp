@@ -162,6 +162,8 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
       env.GetMethodID(entity_class, kEntitySetYawMethod, kEntitySetYawSignature, kEntityClass);
   entity_set_pitch =
       env.GetMethodID(entity_class, kEntitySetPitchMethod, kEntitySetPitchSignature, kEntityClass);
+  entity_get_velocity = env.GetMethodID(
+      entity_class, kEntityGetVelocityMethod, kEntityGetVelocitySignature, kEntityClass);
 
   living_entity_get_health = env.GetMethodID(living_entity_class,
                                              kLivingEntityGetHealthMethod,
@@ -227,8 +229,9 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
       entity_get_y == nullptr || entity_get_z == nullptr || iterable_iterator == nullptr ||
       iterator_has_next == nullptr || iterator_next == nullptr || entity_get_type == nullptr ||
       entity_get_eye_y == nullptr || entity_is_invisible == nullptr || entity_set_yaw == nullptr ||
-      entity_set_pitch == nullptr || living_entity_get_health == nullptr ||
-      living_entity_get_max_health == nullptr || living_entity_get_absorption_amount == nullptr ||
+      entity_set_pitch == nullptr || entity_get_velocity == nullptr ||
+      living_entity_get_health == nullptr || living_entity_get_max_health == nullptr ||
+      living_entity_get_absorption_amount == nullptr ||
       living_entity_has_line_of_sight == nullptr) {
     Reset(env.get());
     PrintStatus("jni cache initialization failed: missing member handles");
@@ -338,6 +341,7 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   entity_is_invisible = nullptr;
   entity_set_yaw = nullptr;
   entity_set_pitch = nullptr;
+  entity_get_velocity = nullptr;
   entity_type_translation_key_field = nullptr;
   living_entity_get_health = nullptr;
   living_entity_get_max_health = nullptr;

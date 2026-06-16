@@ -498,6 +498,22 @@ double Entity::GetEyeY(const JniEnv& env, const JniCache& cache, jobject entity)
   return static_cast<double>(env->CallDoubleMethod(entity, cache.entity_get_eye_y));
 }
 
+Vec3 Entity::GetVelocity(const JniEnv& env, const JniCache& cache, jobject entity) {
+  if (!env || !cache.is_initialized() || entity == nullptr ||
+      cache.entity_get_velocity == nullptr) {
+    return {};
+  }
+
+  auto velocity = CallObjectMethodReference(env,
+                                            entity,
+                                            cache.entity_get_velocity,
+                                            kEntityClass,
+                                            kEntityGetVelocityMethod,
+                                            kEntityGetVelocitySignature);
+  if (!velocity) { return {}; }
+  return ReadVec3d(env, cache, velocity.get());
+}
+
 bool Entity::IsInvisible(const JniEnv& env, const JniCache& cache, jobject entity) {
   if (!env || !cache.is_initialized() || entity == nullptr ||
       cache.entity_is_invisible == nullptr) {

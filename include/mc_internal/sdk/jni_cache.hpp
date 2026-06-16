@@ -61,6 +61,7 @@ struct JniCache {
   jmethodID entity_is_invisible = nullptr;
   jmethodID entity_set_yaw = nullptr;
   jmethodID entity_set_pitch = nullptr;
+  jmethodID entity_get_velocity = nullptr;
   jfieldID entity_type_translation_key_field = nullptr;
   jmethodID living_entity_get_health = nullptr;
   jmethodID living_entity_get_max_health = nullptr;

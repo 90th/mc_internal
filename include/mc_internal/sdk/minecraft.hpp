@@ -89,6 +89,7 @@ class Entity {
   GetName(const JniEnv& env, const JniCache& cache, jobject entity);
   [[nodiscard]] static int GetId(const JniEnv& env, const JniCache& cache, jobject entity);
   [[nodiscard]] static double GetEyeY(const JniEnv& env, const JniCache& cache, jobject entity);
+  [[nodiscard]] static Vec3 GetVelocity(const JniEnv& env, const JniCache& cache, jobject entity);
   [[nodiscard]] static bool IsInvisible(const JniEnv& env, const JniCache& cache, jobject entity);
   static void SetYaw(const JniEnv& env, const JniCache& cache, jobject entity, float yaw);
   static void SetPitch(const JniEnv& env, const JniCache& cache, jobject entity, float pitch);

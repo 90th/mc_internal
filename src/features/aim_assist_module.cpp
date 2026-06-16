@@ -81,6 +81,70 @@ Vec3 ViewDirection(float yaw, float pitch) {
           std::cos(yaw_radians) * pitch_cos};
 }
 
+Vec3 ClampHorizontalVelocity(Vec3 velocity, double max_speed) {
+  velocity.y = 0.0;
+  const double speed_sq = velocity.x * velocity.x + velocity.z * velocity.z;
+  const double max_speed_sq = max_speed * max_speed;
+  if (speed_sq > max_speed_sq && speed_sq > 0.000001) {
+    const double scale = max_speed / std::sqrt(speed_sq);
+    velocity.x *= scale;
+    velocity.z *= scale;
+  }
+  return velocity;
+}
+
+Vec3 PredictPosition(const Vec3& position, const Vec3& velocity, double lead_ticks) {
+  return {position.x + velocity.x * lead_ticks,
+          position.y + velocity.y * lead_ticks,
+          position.z + velocity.z * lead_ticks};
+}
+
+double HorizontalSpeed(const Vec3& velocity) {
+  return std::sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+}
+
+double LateralSpeed(const Vec3& relative_velocity, const Vec3& target_delta) {
+  const double distance_sq = target_delta.x * target_delta.x + target_delta.z * target_delta.z;
+  if (distance_sq <= 0.000001) { return HorizontalSpeed(relative_velocity); }
+
+  const double distance = std::sqrt(distance_sq);
+  const double forward_x = target_delta.x / distance;
+  const double forward_z = target_delta.z / distance;
+  const double forward_speed = relative_velocity.x * forward_x + relative_velocity.z * forward_z;
+  const double speed_sq =
+      relative_velocity.x * relative_velocity.x + relative_velocity.z * relative_velocity.z;
+  return std::sqrt(std::max(speed_sq - forward_speed * forward_speed, 0.0));
+}
+
+float SmoothStep(float value) {
+  value = std::clamp(value, 0.0f, 1.0f);
+  return value * value * (3.0f - 2.0f * value);
+}
+
+float SmartPredictionStrength(double distance,
+                              double max_distance,
+                              const Vec3& relative_velocity,
+                              const Vec3& target_delta) {
+  constexpr float kMinPrediction = 0.95f;
+  constexpr float kMaxPrediction = 1.0f;
+
+  const float distance_t = std::clamp(
+      static_cast<float>((distance - 8.0) / std::max(max_distance * 0.55, 1.0)), 0.0f, 1.0f);
+  const float lateral_speed_t = std::clamp(
+      static_cast<float>(LateralSpeed(relative_velocity, target_delta) / 0.45), 0.0f, 1.0f);
+  const float blend_t = SmoothStep(lateral_speed_t * 0.80f + distance_t * 0.20f);
+  return kMinPrediction + (kMaxPrediction - kMinPrediction) * blend_t;
+}
+
+double PredictionLeadTicks(float prediction_strength, float smoothness) {
+  if (prediction_strength <= 0.0f) { return 0.0; }
+
+  const float delta_time = std::clamp(ImGui::GetIO().DeltaTime, 1.0f / 240.0f, 1.0f / 20.0f);
+  const double response_ticks =
+      std::clamp(static_cast<double>(delta_time) * 20.0 * smoothness, 0.25, 4.0);
+  return response_ticks * static_cast<double>(std::clamp(prediction_strength, 0.0f, 1.0f));
+}
+
 bool RayIntersectsAabb(const Vec3& origin,
                        const Vec3& direction,
                        const Vec3& min,
@@ -159,7 +223,7 @@ void AimAssistModule::on_render_settings(const OverlayContext& ctx) {
   ui::SectionHeader("tuning");
   ui::DescriptionText(
       "higher smoothness slows the correction and keeps the movement looking more human. target "
-      "choice blends crosshair error with distance.");
+      "choice blends crosshair error with distance. prediction automatically adapts to movement.");
   ImGui::Spacing();
 
   ui::LabeledSlider("field of view", "##aim_assist_fov", &fov_degrees_, 1.0f, 180.0f, "%.0f deg");
@@ -192,6 +256,9 @@ void AimAssistModule::on_render_3d(const OverlayContext& ctx) {
   const float current_pitch = Camera::GetPitch(env, ctx.jni_cache, camera.get());
   const float fov_limit = std::max(fov_degrees_, 0.001f);
   const Vec3 view_direction = ViewDirection(current_yaw, current_pitch);
+  constexpr double kMaxPredictedHorizontalSpeed = 2.5;
+  const Vec3 local_velocity = ClampHorizontalVelocity(
+      Entity::GetVelocity(env, ctx.jni_cache, local_player.get()), kMaxPredictedHorizontalSpeed);
   const double max_distance_sq =
       static_cast<double>(max_distance_) * static_cast<double>(max_distance_);
 
@@ -199,6 +266,7 @@ void AimAssistModule::on_render_3d(const OverlayContext& ctx) {
   float best_score = 1e30f;
   float best_target_yaw = 0.0f;
   float best_target_pitch = 0.0f;
+  int best_target_id = 0;
 
   for (auto entity : ClientWorld::GetEntities(env, ctx.jni_cache, world.get())) {
     if (!entity) { continue; }
@@ -236,49 +304,80 @@ void AimAssistModule::on_render_3d(const OverlayContext& ctx) {
     const EntityData entity_data = Entity::GetData(env, ctx.jni_cache, entity.get());
     const double half_width = std::max(static_cast<double>(entity_data.width), 0.3) * 0.5;
     const double height = std::max(static_cast<double>(entity_data.height), 0.6);
-    const Vec3 box_min{entity_x - half_width, entity_y, entity_z - half_width};
-    const Vec3 box_max{entity_x + half_width, entity_y + height, entity_z + half_width};
-    const double aim_y = std::clamp(target_eye_y, box_min.y, box_max.y);
+    const Vec3 target_position{entity_x, entity_y, entity_z};
+    const Vec3 target_velocity = ClampHorizontalVelocity(
+        Entity::GetVelocity(env, ctx.jni_cache, entity.get()), kMaxPredictedHorizontalSpeed);
+    const Vec3 relative_velocity{
+        target_velocity.x - local_velocity.x, 0.0, target_velocity.z - local_velocity.z};
+    const float prediction_strength = SmartPredictionStrength(std::sqrt(distance_sq),
+                                                              static_cast<double>(max_distance_),
+                                                              relative_velocity,
+                                                              {dx, 0.0, dz});
+    const double lead_ticks = PredictionLeadTicks(prediction_strength, smoothness_);
+    const Vec3 predicted_target_position =
+        PredictPosition(target_position, relative_velocity, lead_ticks);
 
-    AimPoint aim_point{};
-    if (RayIntersectsAabb(camera_position, view_direction, box_min, box_max)) {
-      aim_point =
-          BuildAimPoint(camera_position, current_yaw, current_pitch, {entity_x, aim_y, entity_z});
-      aim_point.fov_delta = 0.0f;
+    const Vec3 current_box_min{entity_x - half_width, entity_y, entity_z - half_width};
+    const Vec3 current_box_max{entity_x + half_width, entity_y + height, entity_z + half_width};
+    const Vec3 box_min{predicted_target_position.x - half_width,
+                       predicted_target_position.y,
+                       predicted_target_position.z - half_width};
+    const Vec3 box_max{predicted_target_position.x + half_width,
+                       predicted_target_position.y + height,
+                       predicted_target_position.z + half_width};
+    const double aim_y = std::clamp(target_eye_y, box_min.y, box_max.y);
+    const Vec3 desired_aim_point{predicted_target_position.x, aim_y, predicted_target_position.z};
+
+    AimPoint scoring_point{};
+    if (RayIntersectsAabb(camera_position, view_direction, current_box_min, current_box_max)) {
+      scoring_point = BuildAimPoint(camera_position, current_yaw, current_pitch, desired_aim_point);
+      scoring_point.fov_delta = 0.0f;
     } else {
-      const std::array<double, 3> xs = {box_min.x, entity_x, box_max.x};
+      const std::array<double, 3> xs = {box_min.x, predicted_target_position.x, box_max.x};
       const std::array<double, 5> ys = {
-          box_min.y, entity_y + height * 0.35, entity_y + height * 0.55, aim_y, box_max.y};
-      const std::array<double, 3> zs = {box_min.z, entity_z, box_max.z};
+          box_min.y, box_min.y + height * 0.35, box_min.y + height * 0.55, aim_y, box_max.y};
+      const std::array<double, 3> zs = {box_min.z, predicted_target_position.z, box_max.z};
 
       for (const double sample_x : xs) {
         for (const double sample_y : ys) {
           for (const double sample_z : zs) {
             const AimPoint sample = BuildAimPoint(
                 camera_position, current_yaw, current_pitch, {sample_x, sample_y, sample_z});
-            if (sample.fov_delta < aim_point.fov_delta) { aim_point = sample; }
+            if (sample.fov_delta < scoring_point.fov_delta) { scoring_point = sample; }
           }
         }
       }
     }
 
-    const float fov_delta = aim_point.fov_delta;
+    const float fov_delta = scoring_point.fov_delta;
     if (fov_delta > fov_limit) { continue; }
+
+    const AimPoint aim_point =
+        BuildAimPoint(camera_position, current_yaw, current_pitch, desired_aim_point);
+    if (aim_point.distance_sq <= 0.0001) { continue; }
 
     const float normalized_fov = std::clamp(fov_delta / fov_limit, 0.0f, 1.0f);
     const float normalized_distance =
         std::clamp(static_cast<float>(distance_sq / max_distance_sq), 0.0f, 1.0f);
-    const float score = normalized_fov * 0.75f + normalized_distance * 0.25f;
+    float score = normalized_fov * 0.75f + normalized_distance * 0.25f;
+    const int eid = Entity::GetId(env, ctx.jni_cache, entity.get());
+    if (eid != 0 && eid == locked_target_id_) { score *= 0.82f; }
 
     if (score < best_score) {
       best_score = score;
       best_target_yaw = aim_point.yaw;
       best_target_pitch = aim_point.pitch;
+      best_target_id = eid;
       has_target = true;
     }
   }
 
-  if (!has_target) { return; }
+  if (!has_target) {
+    locked_target_id_ = 0;
+    return;
+  }
+
+  locked_target_id_ = best_target_id;
 
   const float next_yaw = current_yaw + WrapDegrees(best_target_yaw - current_yaw) / smoothness_;
   const float next_pitch = current_pitch + (best_target_pitch - current_pitch) / smoothness_;

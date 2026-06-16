@@ -86,6 +86,8 @@ inline constexpr std::string_view kEntitySetYawMethod = "method_36456";
 inline constexpr std::string_view kEntitySetYawSignature = "(F)V";
 inline constexpr std::string_view kEntitySetPitchMethod = "method_36457";
 inline constexpr std::string_view kEntitySetPitchSignature = "(F)V";
+inline constexpr std::string_view kEntityGetVelocityMethod = "method_18798";
+inline constexpr std::string_view kEntityGetVelocitySignature = "()Lnet/minecraft/class_243;";
 
 inline constexpr std::string_view kPlayerEntityClass = "net/minecraft/class_1657";
 inline constexpr std::string_view kPlayerEntityGetGameProfileMethod = "method_7334";

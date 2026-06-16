@@ -15,6 +15,7 @@ class AimAssistModule : public Module {
   float fov_degrees_ = 25.0f;
   float smoothness_ = 8.0f;
   float max_distance_ = 96.0f;
+  int locked_target_id_ = 0;
   bool line_of_sight_only_ = true;
   bool target_players_ = true;
   bool target_hostiles_ = false;
