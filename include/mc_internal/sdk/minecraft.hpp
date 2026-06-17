@@ -52,6 +52,8 @@ class ClientWorld {
   [[nodiscard]] static ScopedLocalRef<jclass> FindClass(const JniEnv& env, const JniCache& cache);
   [[nodiscard]] static JavaIterable<jobject>
   GetEntities(const JniEnv& env, const JniCache& cache, jobject world_instance);
+  [[nodiscard]] static ScopedLocalRef<jobject>
+  GetEntityById(const JniEnv& env, const JniCache& cache, jobject world_instance, int entity_id);
 };
 
 class GameRenderer {

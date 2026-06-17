@@ -103,6 +103,8 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
                                               kClientWorldGetEntitiesMethod,
                                               kClientWorldGetEntitiesSignature,
                                               kClientWorldClass);
+  client_world_get_entity_by_id = env.TryGetMethodID(
+      client_world_class, kClientWorldGetEntityByIdMethod, kClientWorldGetEntityByIdSignature);
   game_renderer_get_camera = env.GetMethodID(game_renderer_class,
                                              kGameRendererGetCameraMethod,
                                              kGameRendererGetCameraSignature,
@@ -233,8 +235,8 @@ bool JniCache::Initialize(const JniEnv& env) noexcept {
       vec3d_y_field == nullptr || vec3d_z_field == nullptr || entity_get_x == nullptr ||
       entity_get_y == nullptr || entity_get_z == nullptr || iterable_iterator == nullptr ||
       iterator_has_next == nullptr || iterator_next == nullptr || entity_get_type == nullptr ||
-      entity_get_eye_y == nullptr || entity_is_invisible == nullptr || entity_set_yaw == nullptr ||
-      entity_set_pitch == nullptr || entity_get_velocity == nullptr ||
+      entity_get_id == nullptr || entity_get_eye_y == nullptr || entity_is_invisible == nullptr ||
+      entity_set_yaw == nullptr || entity_set_pitch == nullptr || entity_get_velocity == nullptr ||
       living_entity_get_health == nullptr || living_entity_get_max_health == nullptr ||
       living_entity_get_absorption_amount == nullptr ||
       living_entity_has_line_of_sight == nullptr) {
@@ -334,6 +336,7 @@ void JniCache::Reset(JNIEnv* env) noexcept {
   minecraft_client_current_screen_field = nullptr;
   minecraft_client_get_render_tick_counter = nullptr;
   client_world_get_entities = nullptr;
+  client_world_get_entity_by_id = nullptr;
   entity_get_x = nullptr;
   entity_get_y = nullptr;
   entity_get_z = nullptr;

@@ -202,17 +202,6 @@ ImU32 ToImColor(const std::array<float, 4>& color) {
   return ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], color[3]));
 }
 
-struct JniLocalFrame {
-  JNIEnv* env;
-  JniLocalFrame(JNIEnv* e, jint capacity) : env(e->PushLocalFrame(capacity) == 0 ? e : nullptr) {}
-  ~JniLocalFrame() {
-    if (env) env->PopLocalFrame(nullptr);
-  }
-  explicit operator bool() const { return env != nullptr; }
-  JniLocalFrame(const JniLocalFrame&) = delete;
-  JniLocalFrame& operator=(const JniLocalFrame&) = delete;
-};
-
 void DrawCornerEsp(ImDrawList* dl,
                    const ImVec2& mn,
                    const ImVec2& mx,

@@ -54,6 +54,38 @@ class ScopedLocalRef {
   T reference_ = nullptr;
 };
 
+class JniLocalFrame {
+ public:
+  JniLocalFrame() = default;
+
+  JniLocalFrame(JNIEnv* env, jint capacity)
+      : env_(env != nullptr && env->PushLocalFrame(capacity) == 0 ? env : nullptr) {}
+
+  JniLocalFrame(const JniLocalFrame&) = delete;
+  JniLocalFrame& operator=(const JniLocalFrame&) = delete;
+
+  JniLocalFrame(JniLocalFrame&& other) noexcept : env_(std::exchange(other.env_, nullptr)) {}
+
+  JniLocalFrame& operator=(JniLocalFrame&& other) noexcept {
+    if (this == &other) { return *this; }
+    Reset();
+    env_ = std::exchange(other.env_, nullptr);
+    return *this;
+  }
+
+  ~JniLocalFrame() { Reset(); }
+
+  [[nodiscard]] explicit operator bool() const noexcept { return env_ != nullptr; }
+
+  void Reset() noexcept {
+    if (env_ != nullptr) { env_->PopLocalFrame(nullptr); }
+    env_ = nullptr;
+  }
+
+ private:
+  JNIEnv* env_ = nullptr;
+};
+
 // Thin, thread-local wrapper around a JNI environment. Construct this from the
 // current thread's JNIEnv* whenever JNI work is needed; do not cache it across
 // threads.
@@ -90,6 +122,21 @@ struct JniEnv {
                                       std::string_view signature,
                                       std::string_view owner = {}) const noexcept {
     return GetMethodIdImpl(clazz, method_name, signature, owner, false);
+  }
+
+  [[nodiscard]] jmethodID TryGetMethodID(jclass clazz,
+                                         std::string_view method_name,
+                                         std::string_view signature) const noexcept {
+    if (env_ == nullptr || clazz == nullptr) { return nullptr; }
+
+    const std::string method_name_buffer(method_name);
+    const std::string signature_buffer(signature);
+    const jmethodID method_id =
+        env_->GetMethodID(clazz, method_name_buffer.c_str(), signature_buffer.c_str());
+    if (method_id != nullptr) { return method_id; }
+
+    if (env_->ExceptionCheck()) { env_->ExceptionClear(); }
+    return nullptr;
   }
 
   [[nodiscard]] jmethodID GetStaticMethodID(jclass clazz,

@@ -1,8 +1,8 @@
 #include "mc_internal/sdk/minecraft.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <print>
-
 #include "mc_internal/utils/logging.hpp"
 
 namespace mc_internal {
@@ -47,6 +47,16 @@ ScopedLocalRef<jobject> CallObjectMethodReference(const JniEnv& env,
   return {};
 }
 
+void LogJniPrimitiveFailure(std::string_view action,
+                            std::string_view owner,
+                            std::string_view member_name,
+                            std::string_view signature) {
+  const std::string_view resolved_owner = owner.empty() ? "<unknown class>" : owner;
+  std::println(
+      "{} jni {} failed: {}.{} {}", kLogPrefix, action, resolved_owner, member_name, signature);
+  std::fflush(stdout);
+}
+
 float CallFloatMethod(const JniEnv& env,
                       jobject object,
                       jmethodID method_id,
@@ -55,7 +65,12 @@ float CallFloatMethod(const JniEnv& env,
                       std::string_view signature) {
   if (!env || object == nullptr || method_id == nullptr) { return 0.0f; }
 
-  return static_cast<float>(env->CallFloatMethod(object, method_id));
+  const float value = static_cast<float>(env->CallFloatMethod(object, method_id));
+  if (!env->ExceptionCheck()) { return value; }
+
+  (void)env.ClearException("call float method");
+  LogJniPrimitiveFailure("call float method", owner, method_name, signature);
+  return 0.0f;
 }
 
 bool CallBooleanMethod(const JniEnv& env,
@@ -66,7 +81,61 @@ bool CallBooleanMethod(const JniEnv& env,
                        std::string_view signature) {
   if (!env || object == nullptr || method_id == nullptr) { return false; }
 
-  return env->CallBooleanMethod(object, method_id) == JNI_TRUE;
+  const bool value = env->CallBooleanMethod(object, method_id) == JNI_TRUE;
+  if (!env->ExceptionCheck()) { return value; }
+
+  (void)env.ClearException("call boolean method");
+  LogJniPrimitiveFailure("call boolean method", owner, method_name, signature);
+  return false;
+}
+
+bool CallBooleanMethod(const JniEnv& env,
+                       jobject object,
+                       jmethodID method_id,
+                       jobject argument,
+                       std::string_view owner,
+                       std::string_view method_name,
+                       std::string_view signature) {
+  if (!env || object == nullptr || method_id == nullptr || argument == nullptr) { return false; }
+
+  const bool value = env->CallBooleanMethod(object, method_id, argument) == JNI_TRUE;
+  if (!env->ExceptionCheck()) { return value; }
+
+  (void)env.ClearException("call boolean method");
+  LogJniPrimitiveFailure("call boolean method", owner, method_name, signature);
+  return false;
+}
+
+int CallIntMethod(const JniEnv& env,
+                  jobject object,
+                  jmethodID method_id,
+                  std::string_view owner,
+                  std::string_view method_name,
+                  std::string_view signature) {
+  if (!env || object == nullptr || method_id == nullptr) { return 0; }
+
+  const int value = static_cast<int>(env->CallIntMethod(object, method_id));
+  if (!env->ExceptionCheck()) { return value; }
+
+  (void)env.ClearException("call int method");
+  LogJniPrimitiveFailure("call int method", owner, method_name, signature);
+  return 0;
+}
+
+double CallDoubleMethod(const JniEnv& env,
+                        jobject object,
+                        jmethodID method_id,
+                        std::string_view owner,
+                        std::string_view method_name,
+                        std::string_view signature) {
+  if (!env || object == nullptr || method_id == nullptr) { return 0.0; }
+
+  const double value = static_cast<double>(env->CallDoubleMethod(object, method_id));
+  if (!env->ExceptionCheck()) { return value; }
+
+  (void)env.ClearException("call double method");
+  LogJniPrimitiveFailure("call double method", owner, method_name, signature);
+  return 0.0;
 }
 
 double GetDoubleField(const JniEnv& env,
@@ -77,7 +146,28 @@ double GetDoubleField(const JniEnv& env,
                       std::string_view signature) {
   if (!env || object == nullptr || field_id == nullptr) { return 0.0; }
 
-  return static_cast<double>(env->GetDoubleField(object, field_id));
+  const double value = static_cast<double>(env->GetDoubleField(object, field_id));
+  if (!env->ExceptionCheck()) { return value; }
+
+  (void)env.ClearException("get double field");
+  LogJniPrimitiveFailure("get double field", owner, field_name, signature);
+  return 0.0;
+}
+
+void CallVoidMethod(const JniEnv& env,
+                    jobject object,
+                    jmethodID method_id,
+                    jfloat argument,
+                    std::string_view owner,
+                    std::string_view method_name,
+                    std::string_view signature) {
+  if (!env || object == nullptr || method_id == nullptr) { return; }
+
+  env->CallVoidMethod(object, method_id, argument);
+  if (!env->ExceptionCheck()) { return; }
+
+  (void)env.ClearException("call void method");
+  LogJniPrimitiveFailure("call void method", owner, method_name, signature);
 }
 
 Vec3 ReadVec3d(const JniEnv& env, const JniCache& cache, jobject vec3d_object) {
@@ -111,9 +201,8 @@ double CallEntityCoordinateMethod(const JniEnv& env,
                                   jobject entity,
                                   jmethodID method_id,
                                   std::string_view method_name) {
-  if (!env || entity == nullptr || method_id == nullptr) { return 0.0; }
-
-  return static_cast<double>(env->CallDoubleMethod(entity, method_id));
+  return CallDoubleMethod(
+      env, entity, method_id, kEntityClass, method_name, kEntityGetCoordSignature);
 }
 
 }  // namespace
@@ -278,6 +367,35 @@ ClientWorld::GetEntities(const JniEnv& env, const JniCache& cache, jobject world
   return {};
 }
 
+ScopedLocalRef<jobject> ClientWorld::GetEntityById(const JniEnv& env,
+                                                   const JniCache& cache,
+                                                   jobject world_instance,
+                                                   int entity_id) {
+  if (!env || !cache.is_initialized() || world_instance == nullptr ||
+      cache.client_world_get_entity_by_id == nullptr) {
+    return {};
+  }
+
+  if (jobject entity = env->CallObjectMethod(
+          world_instance, cache.client_world_get_entity_by_id, static_cast<jint>(entity_id));
+      entity != nullptr) {
+    if (!env->ExceptionCheck()) { return env.TakeLocal(entity); }
+
+    env->DeleteLocalRef(entity);
+  }
+
+  if (!env->ExceptionCheck()) { return {}; }
+
+  (void)env.ClearException("call object method");
+  std::println("{} jni call object method failed: {}.{} {}",
+               kLogPrefix,
+               kClientWorldClass,
+               kClientWorldGetEntityByIdMethod,
+               kClientWorldGetEntityByIdSignature);
+  std::fflush(stdout);
+  return {};
+}
+
 ScopedLocalRef<jobject>
 GameRenderer::GetCamera(const JniEnv& env, const JniCache& cache, jobject game_renderer_instance) {
   if (!env || !cache.is_initialized() || game_renderer_instance == nullptr ||
@@ -365,11 +483,12 @@ Entity::GetCoordinates(const JniEnv& env, const JniCache& cache, jobject entity)
 }
 
 bool Entity::IsAlive(const JniEnv& env, const JniCache& cache, jobject entity) {
-  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_is_alive == nullptr) {
-    return false;
-  }
-
-  return env->CallBooleanMethod(entity, cache.entity_is_alive) == JNI_TRUE;
+  return CallBooleanMethod(env,
+                           entity,
+                           cache.entity_is_alive,
+                           kEntityClass,
+                           kEntityIsAliveMethod,
+                           kEntityIsAliveSignature);
 }
 
 std::string Entity::GetTranslationKey(const JniEnv& env, const JniCache& cache, jobject entity) {
@@ -502,17 +621,17 @@ std::string Entity::GetName(const JniEnv& env, const JniCache& cache, jobject en
 }
 
 int Entity::GetId(const JniEnv& env, const JniCache& cache, jobject entity) {
-  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_get_id == nullptr) {
-    return 0;
-  }
-  return static_cast<int>(env->CallIntMethod(entity, cache.entity_get_id));
+  return CallIntMethod(
+      env, entity, cache.entity_get_id, kEntityClass, kEntityGetIdMethod, kEntityGetIdSignature);
 }
 
 double Entity::GetEyeY(const JniEnv& env, const JniCache& cache, jobject entity) {
-  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_get_eye_y == nullptr) {
-    return 0.0;
-  }
-  return static_cast<double>(env->CallDoubleMethod(entity, cache.entity_get_eye_y));
+  return CallDoubleMethod(env,
+                          entity,
+                          cache.entity_get_eye_y,
+                          kEntityClass,
+                          kEntityGetEyeYMethod,
+                          kEntityGetEyeYSignature);
 }
 
 Vec3 Entity::GetVelocity(const JniEnv& env, const JniCache& cache, jobject entity) {
@@ -532,25 +651,34 @@ Vec3 Entity::GetVelocity(const JniEnv& env, const JniCache& cache, jobject entit
 }
 
 bool Entity::IsInvisible(const JniEnv& env, const JniCache& cache, jobject entity) {
-  if (!env || !cache.is_initialized() || entity == nullptr ||
-      cache.entity_is_invisible == nullptr) {
-    return false;
-  }
-  return env->CallBooleanMethod(entity, cache.entity_is_invisible) == JNI_TRUE;
+  return CallBooleanMethod(env,
+                           entity,
+                           cache.entity_is_invisible,
+                           kEntityClass,
+                           kEntityIsInvisibleMethod,
+                           kEntityIsInvisibleSignature);
 }
 
 void Entity::SetYaw(const JniEnv& env, const JniCache& cache, jobject entity, float yaw) {
-  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_set_yaw == nullptr) {
-    return;
-  }
-  env->CallVoidMethod(entity, cache.entity_set_yaw, static_cast<jfloat>(yaw));
+  if (!std::isfinite(yaw)) { return; }
+  CallVoidMethod(env,
+                 entity,
+                 cache.entity_set_yaw,
+                 static_cast<jfloat>(yaw),
+                 kEntityClass,
+                 kEntitySetYawMethod,
+                 kEntitySetYawSignature);
 }
 
 void Entity::SetPitch(const JniEnv& env, const JniCache& cache, jobject entity, float pitch) {
-  if (!env || !cache.is_initialized() || entity == nullptr || cache.entity_set_pitch == nullptr) {
-    return;
-  }
-  env->CallVoidMethod(entity, cache.entity_set_pitch, static_cast<jfloat>(pitch));
+  if (!std::isfinite(pitch)) { return; }
+  CallVoidMethod(env,
+                 entity,
+                 cache.entity_set_pitch,
+                 static_cast<jfloat>(pitch),
+                 kEntityClass,
+                 kEntitySetPitchMethod,
+                 kEntitySetPitchSignature);
 }
 
 EntityData Entity::GetData(const JniEnv& env, const JniCache& cache, jobject entity) {
@@ -616,11 +744,13 @@ bool LivingEntity::HasLineOfSight(const JniEnv& env,
                                   const JniCache& cache,
                                   jobject entity,
                                   jobject target) {
-  if (!env || !cache.is_initialized() || entity == nullptr || target == nullptr ||
-      cache.living_entity_has_line_of_sight == nullptr) {
-    return false;
-  }
-  return env->CallBooleanMethod(entity, cache.living_entity_has_line_of_sight, target) == JNI_TRUE;
+  return CallBooleanMethod(env,
+                           entity,
+                           cache.living_entity_has_line_of_sight,
+                           target,
+                           kLivingEntityClass,
+                           kLivingEntityHasLineOfSightMethod,
+                           kLivingEntityHasLineOfSightSignature);
 }
 
 }  // namespace mc_internal

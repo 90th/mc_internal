@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.24)
 
 project(mc_internal LANGUAGES C CXX ASM)
 
+include(CTest)
+
 # Export compile commands so clangd and other tools can find per-file flags
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -95,6 +97,7 @@ target_sources(mc_internal PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/features/debug_hud_module.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/features/esp_module.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/features/aim_assist_module.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/features/aim_assist_detail.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ui/opengl_state.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ui/imgui_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/ui/input_handler.cpp
@@ -127,3 +130,16 @@ target_link_libraries(mc_internal
         dl
         pthread
 )
+
+if(BUILD_TESTING)
+  add_executable(mc_internal_aim_assist_detail_test
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/aim_assist_detail_test.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/features/aim_assist_detail.cpp
+  )
+  target_compile_features(mc_internal_aim_assist_detail_test PRIVATE cxx_std_23)
+  target_include_directories(mc_internal_aim_assist_detail_test
+      PRIVATE
+          ${CMAKE_CURRENT_SOURCE_DIR}/include
+  )
+  add_test(NAME mc_internal_aim_assist_detail_test COMMAND mc_internal_aim_assist_detail_test)
+endif()

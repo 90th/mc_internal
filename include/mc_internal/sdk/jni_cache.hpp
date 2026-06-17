@@ -47,7 +47,7 @@ struct JniCache {
   jfieldID minecraft_client_current_screen_field = nullptr;
   jmethodID minecraft_client_get_render_tick_counter = nullptr;
   jmethodID client_world_get_entities = nullptr;
-
+  jmethodID client_world_get_entity_by_id = nullptr;
   jmethodID entity_get_x = nullptr;
   jmethodID entity_get_y = nullptr;
   jmethodID entity_get_z = nullptr;

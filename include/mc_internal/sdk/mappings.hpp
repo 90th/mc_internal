@@ -63,6 +63,9 @@ inline constexpr std::string_view kRenderTickCounterGetTickProgressSignature = "
 
 inline constexpr std::string_view kClientWorldGetEntitiesMethod = "method_18112";
 inline constexpr std::string_view kClientWorldGetEntitiesSignature = "()Ljava/lang/Iterable;";
+inline constexpr std::string_view kClientWorldGetEntityByIdMethod = "method_8469";
+inline constexpr std::string_view kClientWorldGetEntityByIdSignature =
+    "(I)Lnet/minecraft/class_1297;";
 
 inline constexpr std::string_view kEntityGetXMethod = "method_23317";
 inline constexpr std::string_view kEntityGetYMethod = "method_23318";

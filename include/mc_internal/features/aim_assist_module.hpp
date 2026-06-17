@@ -10,6 +10,7 @@ class AimAssistModule : public Module {
  public:
   AimAssistModule();
 
+  void on_disable() override;
   void on_render_settings(const OverlayContext& ctx) override;
   [[nodiscard]] bool has_header_controls() const noexcept override { return true; }
   void on_render_header_controls(const OverlayContext& ctx) override;
@@ -21,6 +22,33 @@ class AimAssistModule : public Module {
     kMouse,
   };
 
+  enum class RuntimeStatus {
+    kIdle,
+    kBindUnbound,
+    kNoTargetTypesEnabled,
+    kInvalidConfig,
+    kJvmUnavailable,
+    kCacheUnavailable,
+    kNotInGame,
+    kScreenOpen,
+    kCameraUnavailable,
+    kInvalidRuntimeData,
+    kHostileMappingsUnavailable,
+    kNoTarget,
+    kTracking,
+  };
+
+  enum class HostileKeyStatus {
+    kUnknown,
+    kReady,
+    kUnavailable,
+  };
+
+  void clear_locked_target() noexcept;
+  void reset_runtime_state(RuntimeStatus status, bool activation_was_down) noexcept;
+  void set_tracking_state(int target_id) noexcept;
+  [[nodiscard]] const char* runtime_status_label() const noexcept;
+  [[nodiscard]] const char* hostile_key_status_label() const noexcept;
   [[nodiscard]] bool is_activation_held(const OverlayContext& ctx) const;
   [[nodiscard]] std::string activation_bind_label() const;
   void update_bind_capture(const OverlayContext& ctx);
@@ -31,6 +59,9 @@ class AimAssistModule : public Module {
   int locked_target_id_ = 0;
   int activation_bind_code_ = 0;
   ActivationBindType activation_bind_type_ = ActivationBindType::kMouse;
+  RuntimeStatus runtime_status_ = RuntimeStatus::kIdle;
+  HostileKeyStatus hostile_key_status_ = HostileKeyStatus::kUnknown;
+  bool has_locked_target_ = false;
   bool activation_was_down_ = false;
   bool waiting_for_bind_ = false;
   bool bind_capture_armed_ = false;
